@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VerificaPay
 
-## Getting Started
+Dashboard para comercios que reciben pagos por billeteras virtuales (Mercado Pago y otras). Permite a dueños y empleados verificar en un solo lugar los pagos acreditados, sin tener que mirar el celular o la app del proveedor en el mostrador.
 
-First, run the development server:
+## Cómo funciona
+
+1. El dueño del comercio conecta su cuenta de Mercado Pago (u otra billetera) desde **Billeteras**, cargando el `access_token` de la API.
+2. Mercado Pago manda un **webhook** a `/api/webhooks/mercadopago` cada vez que hay un movimiento de pago.
+3. El webhook busca el pago completo en la API de MP, valida que sea un ingreso real (no una autotransferencia) y lo guarda en la tabla `payments` de Supabase.
+4. El dashboard escucha esa tabla por **Supabase Realtime** y se actualiza solo apenas entra un pago nuevo. También hay un botón para actualizar manualmente.
+
+## Stack
+
+- [Next.js 16](https://nextjs.org) (App Router, Server Actions) + React 19 + TypeScript
+- [Supabase](https://supabase.com) — Postgres, Auth y Realtime
+- Tailwind CSS 4
+
+> Este repo usa una versión de Next.js con cambios respecto a lo habitual (ver `AGENTS.md`). Antes de tocar código de routing/config, revisar `node_modules/next/dist/docs/`.
+
+## Modelo de datos
+
+- **organizations**: cada comercio. Tiene un `invite_code` para que los empleados se sumen.
+- **profiles**: 1:1 con `auth.users`. Define `role` (`owner` | `employee`) y a qué organización pertenece.
+- **wallets**: billeteras conectadas por organización (`provider`, `access_token`, `collector_id`). `collector_id` es el `user_id` de Mercado Pago del dueño de la cuenta — se usa para matchear cada webhook con su organización.
+- **payments**: pagos recibidos, alimentados exclusivamente por el webhook. Guarda el payload crudo (`raw`) además de los campos normalizados.
+
+Todo el esquema (tablas, índices, RLS, función `current_organization_id()`, publicación de Realtime) está en [`supabase/schema.sql`](supabase/schema.sql) — es idempotente, se puede volver a correr entero en el SQL Editor de Supabase sin romper nada.
+
+## Setup local
+
+### 1. Variables de entorno
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.local.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Completá con los datos de tu proyecto Supabase (Project Settings → API):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | De dónde sale |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Project Settings → API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API (¡no exponer al cliente!) |
+| `MP_WEBHOOK_SECRET` | Panel de Mercado Pago → Tu aplicación → Webhooks → Configurar notificaciones → Clave secreta |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 2. Base de datos
 
-## Learn More
+Corré [`supabase/schema.sql`](supabase/schema.sql) completo en el SQL Editor de tu proyecto Supabase.
 
-To learn more about Next.js, take a look at the following resources:
+### 3. Instalar y correr
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm install
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Abrí [http://localhost:3000](http://localhost:3000). Te va a redirigir a `/login` si no tenés sesión.
 
-## Deploy on Vercel
+### 4. Datos de prueba (opcional)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+node scripts/seed-users.mjs
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Crea un comercio de prueba con un usuario `owner` y uno `employee` (las credenciales quedan impresas en la consola al terminar).
+
+### 5. Conectar Mercado Pago y probar el webhook
+
+1. Logueate como owner y entrá a **Billeteras** → agregá una wallet `Mercado Pago` con un `access_token` de prueba (cuenta de test de MP). Al guardarla, la app resuelve automáticamente el `collector_id` contra la API de MP.
+2. Mercado Pago necesita poder pegarle a tu `/api/webhooks/mercadopago` desde internet. En local, exponé el puerto 3000 con un túnel (por ejemplo la pestaña **Ports** de VS Code, ngrok, o cloudflared).
+3. Si accedés a la app por un dominio de túnel distinto de `localhost`, agregalo a `serverActions.allowedOrigins` en [`next.config.ts`](next.config.ts) — si no, el login y otras Server Actions van a fallar con "Invalid Server Actions request".
+4. Cargá esa URL pública (`https://.../api/webhooks/mercadopago`) en el panel de Mercado Pago, en Webhooks, para el evento **Pagos**.
+5. Generá un pago real en la cuenta de test (Checkout Pro, transferencia/CVU, etc.). Debería aparecer solo en el dashboard.
+
+> El simulador de notificaciones del panel de MP manda un `payment.id` que no existe de verdad — sirve para validar que la firma y la URL responden, pero no va a insertar un pago real en la tabla.
+
+## Estructura del proyecto
+
+```
+src/
+  app/
+    api/
+      payments/            GET — pagos de la organización (o mock si no hay wallet conectada)
+      webhooks/mercadopago/ POST — recibe notificaciones de Mercado Pago
+    auth/actions.ts         Server Actions de login/signup/logout
+    login/, signup/         Páginas públicas
+    wallets/                Alta/baja de billeteras (solo owner)
+    page.tsx                Dashboard principal
+  components/                UI (dashboard, lista de pagos, sidebar, etc.)
+  lib/
+    mercadopago.ts           Cliente de la API de MP + validación de firma del webhook
+    supabase/                Clientes de Supabase: browser, server (cookies), service (webhook)
+    database.types.ts        Tipos de las tablas
+    mock-data.ts             Generador de pagos falsos (fallback sin wallet conectada)
+supabase/schema.sql          Esquema completo de la base
+scripts/seed-users.mjs       Seed de comercio + usuarios de prueba
+```
+
+## Notas de seguridad
+
+- `wallets.access_token` se guarda en texto plano — para producción, cifrarlo o usar Supabase Vault (ver nota al final de `schema.sql`).
+- El webhook valida la firma de Mercado Pago (`x-signature`) contra `MP_WEBHOOK_SECRET` si está configurada; sin ese secret, no rechaza nada.
+- La `service_role` key solo se usa server-side (webhook), nunca se expone al cliente.
