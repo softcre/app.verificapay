@@ -3,7 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/sidebar";
 import WalletsManager from "@/components/wallets-manager";
 
-export default async function WalletsPage() {
+export default async function WalletsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mp_connected?: string; mp_error?: string }>;
+}) {
+  const params = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -53,6 +58,10 @@ export default async function WalletsPage() {
             wallets={wallets ?? []}
             role={profile.role}
             inviteCode={org?.invite_code ?? ""}
+            mpNotice={{
+              connected: params.mp_connected === "1",
+              error: params.mp_error,
+            }}
           />
         </main>
       </div>

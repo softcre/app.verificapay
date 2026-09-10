@@ -1,4 +1,4 @@
-export type UserRole = "owner" | "employee";
+export type UserRole = "owner" | "employee" | "superadmin";
 export type WalletProvider =
   | "mercado_pago"
   | "naranja_x"
@@ -30,6 +30,7 @@ export interface Wallet {
   alias: string;
   public_key: string | null;
   access_token: string | null;
+  refresh_token: string | null;
   external_user_id: string | null;
   collector_id: string | null;
   status: WalletStatus;

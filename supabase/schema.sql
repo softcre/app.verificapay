@@ -20,10 +20,14 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   organization_id uuid not null references public.organizations(id) on delete cascade,
   full_name text not null,
-  role text not null default 'employee' check (role in ('owner', 'employee')),
+  role text not null default 'employee' constraint profiles_role_check check (role in ('owner', 'employee', 'superadmin')),
   shift text,
   created_at timestamptz not null default now()
 );
+
+-- Delta idempotente para bases ya creadas antes de sumar el rol superadmin:
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check check (role in ('owner', 'employee', 'superadmin'));
 
 create index if not exists profiles_organization_id_idx on public.profiles(organization_id);
 
@@ -37,6 +41,7 @@ create table if not exists public.wallets (
   alias text not null,
   public_key text,
   access_token text, -- almacenar cifrado en producción (ver nota de seguridad al final)
+  refresh_token text, -- token OAuth para renovar el access_token cuando expire
   external_user_id text,
   collector_id text, -- user_id de MP (u otro proveedor) dueño de la cuenta; usado para matchear webhooks
   status text not null default 'active' check (status in ('active', 'inactive', 'error')),
@@ -44,6 +49,9 @@ create table if not exists public.wallets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Delta idempotente para bases ya creadas antes de sumar OAuth:
+alter table public.wallets add column if not exists refresh_token text;
 
 create index if not exists wallets_organization_id_idx on public.wallets(organization_id);
 create unique index if not exists wallets_collector_id_idx on public.wallets(provider, collector_id) where collector_id is not null;
@@ -133,6 +141,12 @@ create policy "org: select own"
   on public.organizations for select
   using (id = public.current_organization_id());
 
+-- organizations: un superadmin puede LEER todas las organizaciones
+drop policy if exists "org: select all (superadmin)" on public.organizations;
+create policy "org: select all (superadmin)"
+  on public.organizations for select
+  using (public.current_role() = 'superadmin');
+
 -- organizations: solo el owner puede actualizar datos del comercio
 drop policy if exists "org: update by owner" on public.organizations;
 create policy "org: update by owner"
@@ -151,6 +165,12 @@ create policy "profiles: select same org"
   on public.profiles for select
   using (organization_id = public.current_organization_id());
 
+-- profiles: un superadmin puede LEER perfiles de cualquier organización
+drop policy if exists "profiles: select all (superadmin)" on public.profiles;
+create policy "profiles: select all (superadmin)"
+  on public.profiles for select
+  using (public.current_role() = 'superadmin');
+
 -- profiles: un usuario solo puede crear su propio perfil (signup)
 drop policy if exists "profiles: insert own" on public.profiles;
 create policy "profiles: insert own"
@@ -168,6 +188,12 @@ drop policy if exists "wallets: select same org" on public.wallets;
 create policy "wallets: select same org"
   on public.wallets for select
   using (organization_id = public.current_organization_id());
+
+-- wallets: un superadmin puede LEER billeteras de cualquier organización
+drop policy if exists "wallets: select all (superadmin)" on public.wallets;
+create policy "wallets: select all (superadmin)"
+  on public.wallets for select
+  using (public.current_role() = 'superadmin');
 
 -- wallets: solo el owner administra billeteras
 drop policy if exists "wallets: insert by owner" on public.wallets;
@@ -191,6 +217,12 @@ drop policy if exists "payments: select same org" on public.payments;
 create policy "payments: select same org"
   on public.payments for select
   using (organization_id = public.current_organization_id());
+
+-- payments: un superadmin puede LEER pagos de cualquier organización
+drop policy if exists "payments: select all (superadmin)" on public.payments;
+create policy "payments: select all (superadmin)"
+  on public.payments for select
+  using (public.current_role() = 'superadmin');
 
 -- ============================================================
 -- NOTA DE SEGURIDAD

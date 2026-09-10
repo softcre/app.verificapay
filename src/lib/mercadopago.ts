@@ -126,6 +126,65 @@ export async function getMercadoPagoCollectorId(
   return String(json.id);
 }
 
+export interface MpOAuthTokens {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope: string;
+  user_id: number;
+  refresh_token?: string;
+  public_key?: string;
+  live_mode: boolean;
+}
+
+export function getMercadoPagoAuthorizationUrl(params: {
+  state: string;
+  redirectUri: string;
+}): string {
+  const clientId = process.env.MP_CLIENT_ID;
+  if (!clientId) {
+    throw new Error("Falta configurar MP_CLIENT_ID.");
+  }
+
+  const url = new URL("https://auth.mercadopago.com.ar/authorization");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("platform_id", "mp");
+  url.searchParams.set("redirect_uri", params.redirectUri);
+  url.searchParams.set("state", params.state);
+  return url.toString();
+}
+
+export async function exchangeMercadoPagoOAuthCode(params: {
+  code: string;
+  redirectUri: string;
+}): Promise<MpOAuthTokens> {
+  const clientId = process.env.MP_CLIENT_ID;
+  const clientSecret = process.env.MP_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error("Falta configurar MP_CLIENT_ID / MP_CLIENT_SECRET.");
+  }
+
+  const res = await fetch("https://api.mercadopago.com/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "authorization_code",
+      code: params.code,
+      redirect_uri: params.redirectUri,
+    }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`Mercado Pago respondió ${res.status} al canjear el code por un access token`);
+  }
+
+  return res.json();
+}
+
 export function verifyMercadoPagoSignature(params: {
   xSignature: string | null;
   xRequestId: string | null;
