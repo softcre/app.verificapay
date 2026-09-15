@@ -4,7 +4,6 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   IconDashboard,
-  IconPayments,
   IconChart,
   IconUsers,
   IconSettings,
@@ -17,8 +16,7 @@ import { UserRole } from "@/lib/database.types";
 import { logout } from "@/app/auth/actions";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", icon: IconDashboard, href: "/dashboard", hideForSuperadmin: true },
-  { label: "Pagos", icon: IconPayments, href: "/", hideForSuperadmin: true },
+  { label: "Pagos", icon: IconDashboard, href: "/dashboard", hideForSuperadmin: true },
   { label: "Reportes", icon: IconChart, href: "#", hideForSuperadmin: true },
   { label: "Cajeros", icon: IconUsers, href: "/cajeros", ownerOnly: true },
   { label: "Seguridad", icon: IconShield, href: "#", hideForSuperadmin: true },
