@@ -23,6 +23,10 @@ export default async function LiveDashboardPage() {
     redirect("/login");
   }
 
+  if (profile.role === "superadmin") {
+    redirect("/superadmin");
+  }
+
   const orgName =
     (profile.organizations as unknown as { name: string } | null)?.name ??
     "Mi comercio";

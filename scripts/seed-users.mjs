@@ -1,4 +1,4 @@
-// Crea un comercio de prueba con un owner y un empleado.
+// Crea un superadmin, un comercio de prueba con un owner y un empleado.
 // Requiere SUPABASE_SERVICE_ROLE_KEY en .env.local (Project Settings > API en Supabase).
 // Ejecutar con: node scripts/seed-users.mjs
 
@@ -34,6 +34,13 @@ const supabase = createClient(url, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+const SUPERADMIN = {
+  email: "superadmin@verificapay.test",
+  password: "VerificaPay123!",
+  fullName: "Superadmin de Prueba",
+  businessName: "VerificaPay (interno)",
+};
+
 const OWNER = {
   email: "owner@verificapay.test",
   password: "VerificaPay123!",
@@ -59,6 +66,29 @@ async function createAuthUser({ email, password }) {
 }
 
 async function main() {
+  console.log("Creando organización interna (superadmin)...");
+  const { data: internalOrg, error: internalOrgError } = await supabase
+    .from("organizations")
+    .insert({ name: SUPERADMIN.businessName })
+    .select("id")
+    .single();
+  if (internalOrgError)
+    throw new Error(`Creando organización interna: ${internalOrgError.message}`);
+
+  console.log(`Creando superadmin (${SUPERADMIN.email})...`);
+  const superadminUser = await createAuthUser(SUPERADMIN);
+  const { error: superadminProfileError } = await supabase
+    .from("profiles")
+    .insert({
+      id: superadminUser.id,
+      organization_id: internalOrg.id,
+      full_name: SUPERADMIN.fullName,
+      email: SUPERADMIN.email,
+      role: "superadmin",
+    });
+  if (superadminProfileError)
+    throw new Error(`Perfil superadmin: ${superadminProfileError.message}`);
+
   console.log("Creando organización...");
   const { data: org, error: orgError } = await supabase
     .from("organizations")
@@ -74,7 +104,9 @@ async function main() {
     id: ownerUser.id,
     organization_id: org.id,
     full_name: OWNER.fullName,
+    email: OWNER.email,
     role: "owner",
+    created_by: superadminUser.id,
   });
   if (ownerProfileError)
     throw new Error(`Perfil owner: ${ownerProfileError.message}`);
@@ -87,15 +119,18 @@ async function main() {
       id: employeeUser.id,
       organization_id: org.id,
       full_name: EMPLOYEE.fullName,
+      email: EMPLOYEE.email,
       role: "employee",
       shift: EMPLOYEE.shift,
+      created_by: ownerUser.id,
     });
   if (employeeProfileError)
     throw new Error(`Perfil empleado: ${employeeProfileError.message}`);
 
   console.log("\nListo. Credenciales de prueba:");
-  console.log(`  Owner:    ${OWNER.email} / ${OWNER.password}`);
-  console.log(`  Empleado: ${EMPLOYEE.email} / ${EMPLOYEE.password}`);
+  console.log(`  Superadmin: ${SUPERADMIN.email} / ${SUPERADMIN.password}`);
+  console.log(`  Owner:      ${OWNER.email} / ${OWNER.password}`);
+  console.log(`  Empleado:   ${EMPLOYEE.email} / ${EMPLOYEE.password}`);
   console.log(`  Invite code del comercio: ${org.invite_code}`);
 }
 

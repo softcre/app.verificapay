@@ -111,7 +111,7 @@ export default function DashboardClient({
 
   return (
     <div className="flex h-full">
-      <Sidebar role={role} />
+      <Sidebar role={role} userName={userName} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <Header

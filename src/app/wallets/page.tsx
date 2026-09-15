@@ -21,12 +21,16 @@ export default async function WalletsPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, organization_id, organizations(name, invite_code)")
+    .select("role, full_name, email, organization_id, organizations(name, invite_code)")
     .eq("id", user.id)
     .single();
 
   if (!profile) {
     redirect("/login");
+  }
+
+  if (profile.role === "superadmin") {
+    redirect("/superadmin");
   }
 
   const { data: wallets } = await supabase
@@ -41,7 +45,11 @@ export default async function WalletsPage({
 
   return (
     <div className="flex h-full">
-      <Sidebar role={profile.role} />
+      <Sidebar
+        role={profile.role}
+        userName={profile.full_name}
+        userEmail={profile.email}
+      />
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-card border-b border-card-border px-4 sm:px-6 py-3">
