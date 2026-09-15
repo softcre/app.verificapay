@@ -134,7 +134,7 @@ export default function DashboardClient({
             </p>
           </div>
 
-          <StatsBar payments={payments} />
+          {role !== "employee" && <StatsBar payments={payments} />}
 
           <Filters
             activeFilter={activeFilter}

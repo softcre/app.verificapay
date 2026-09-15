@@ -19,7 +19,7 @@ export async function login(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -28,7 +28,13 @@ export async function login(
     return { error: "Email o contraseña incorrectos." };
   }
 
-  redirect("/");
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", signInData.user.id)
+    .single();
+
+  redirect(profile?.role === "superadmin" ? "/superadmin" : "/dashboard");
 }
 
 export async function signUpOwner(
@@ -81,7 +87,7 @@ export async function signUpOwner(
     return { error: "No se pudo crear tu perfil. Probá de nuevo." };
   }
 
-  redirect("/");
+  redirect("/dashboard");
 }
 
 export async function signUpEmployee(
@@ -136,7 +142,7 @@ export async function signUpEmployee(
     return { error: "No se pudo unir al comercio. Probá de nuevo." };
   }
 
-  redirect("/");
+  redirect("/dashboard");
 }
 
 export async function logout() {
