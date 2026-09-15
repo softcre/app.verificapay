@@ -73,6 +73,7 @@ export async function signUpOwner(
     id: signUpData.user.id,
     organization_id: org.id,
     full_name: fullName,
+    email,
     role: "owner",
   });
 
@@ -126,6 +127,7 @@ export async function signUpEmployee(
     id: signUpData.user.id,
     organization_id: org.id,
     full_name: fullName,
+    email,
     role: "employee",
     shift: shift || null,
   });

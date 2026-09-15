@@ -20,14 +20,30 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   organization_id uuid not null references public.organizations(id) on delete cascade,
   full_name text not null,
+  email text,
   role text not null default 'employee' constraint profiles_role_check check (role in ('owner', 'employee', 'superadmin')),
   shift text,
+  status text not null default 'active' constraint profiles_status_check check (status in ('active', 'inactive')),
+  created_by uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
 -- Delta idempotente para bases ya creadas antes de sumar el rol superadmin:
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check check (role in ('owner', 'employee', 'superadmin'));
+
+-- Delta idempotente para bases ya creadas antes del módulo de cajeros:
+alter table public.profiles add column if not exists email text;
+alter table public.profiles add column if not exists status text not null default 'active';
+alter table public.profiles add column if not exists created_by uuid references public.profiles(id) on delete set null;
+alter table public.profiles drop constraint if exists profiles_status_check;
+alter table public.profiles add constraint profiles_status_check check (status in ('active', 'inactive'));
+
+-- Rellena el email de los perfiles existentes desde auth.users:
+update public.profiles p
+  set email = u.email
+  from auth.users u
+  where u.id = p.id and p.email is null;
 
 create index if not exists profiles_organization_id_idx on public.profiles(organization_id);
 
@@ -127,6 +143,16 @@ as $$
   select role from public.profiles where id = auth.uid();
 $$;
 
+create or replace function public.current_profile_status()
+returns text
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select status from public.profiles where id = auth.uid();
+$$;
+
 -- ============================================================
 -- RLS
 -- ============================================================
@@ -177,11 +203,50 @@ create policy "profiles: insert own"
   on public.profiles for insert
   with check (id = auth.uid());
 
--- profiles: un usuario puede actualizar su propio perfil
+-- profiles: un usuario puede actualizar su propio perfil, pero no puede
+-- cambiarse el rol, la organización ni reactivarse solo.
 drop policy if exists "profiles: update own" on public.profiles;
 create policy "profiles: update own"
   on public.profiles for update
-  using (id = auth.uid());
+  using (id = auth.uid())
+  with check (
+    id = auth.uid()
+    and role = public.current_role()
+    and organization_id = public.current_organization_id()
+    and status = public.current_profile_status()
+  );
+
+-- profiles: el owner administra los cajeros (empleados) de su comercio
+drop policy if exists "profiles: insert employee by owner" on public.profiles;
+create policy "profiles: insert employee by owner"
+  on public.profiles for insert
+  with check (
+    organization_id = public.current_organization_id()
+    and public.current_role() = 'owner'
+    and role = 'employee'
+  );
+
+drop policy if exists "profiles: update employee by owner" on public.profiles;
+create policy "profiles: update employee by owner"
+  on public.profiles for update
+  using (
+    organization_id = public.current_organization_id()
+    and public.current_role() = 'owner'
+    and role = 'employee'
+  )
+  with check (
+    organization_id = public.current_organization_id()
+    and role = 'employee'
+  );
+
+drop policy if exists "profiles: delete employee by owner" on public.profiles;
+create policy "profiles: delete employee by owner"
+  on public.profiles for delete
+  using (
+    organization_id = public.current_organization_id()
+    and public.current_role() = 'owner'
+    and role = 'employee'
+  );
 
 -- wallets: ver billeteras del propio comercio
 drop policy if exists "wallets: select same org" on public.wallets;

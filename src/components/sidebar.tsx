@@ -18,7 +18,7 @@ const NAV_ITEMS = [
   { label: "Dashboard", icon: IconDashboard, href: "/dashboard" },
   { label: "Pagos", icon: IconPayments, href: "/" },
   { label: "Reportes", icon: IconChart, href: "#" },
-  { label: "Cajeros", icon: IconUsers, href: "#" },
+  { label: "Cajeros", icon: IconUsers, href: "/cajeros", ownerOnly: true },
   { label: "Seguridad", icon: IconShield, href: "#" },
   { label: "Billeteras", icon: IconSettings, href: "/wallets" },
 ];
@@ -26,6 +26,9 @@ const NAV_ITEMS = [
 export default function Sidebar({ role }: { role?: UserRole }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const navItems = NAV_ITEMS.filter(
+    (item) => !item.ownerOnly || role === "owner"
+  );
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -42,7 +45,7 @@ export default function Sidebar({ role }: { role?: UserRole }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.href === pathname;
           return (

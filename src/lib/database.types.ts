@@ -6,6 +6,7 @@ export type WalletProvider =
   | "cuenta_dni"
   | "modo";
 export type WalletStatus = "active" | "inactive" | "error";
+export type ProfileStatus = "active" | "inactive";
 
 export interface Organization {
   id: string;
@@ -18,8 +19,11 @@ export interface Profile {
   id: string;
   organization_id: string;
   full_name: string;
+  email: string | null;
   role: UserRole;
   shift: string | null;
+  status: ProfileStatus;
+  created_by: string | null;
   created_at: string;
 }
 
