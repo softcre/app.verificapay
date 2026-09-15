@@ -16,6 +16,8 @@ interface DashboardClientProps {
   shift: string | null;
   role: UserRole;
   organizationId: string;
+  endpoint?: string;
+  enableRealtime?: boolean;
 }
 
 export default function DashboardClient({
@@ -24,6 +26,8 @@ export default function DashboardClient({
   shift,
   role,
   organizationId,
+  endpoint = "/api/payments",
+  enableRealtime = true,
 }: DashboardClientProps) {
   const [data, setData] = useState<PaymentsResponse | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -35,7 +39,7 @@ export default function DashboardClient({
   const fetchPayments = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const res = await fetch("/api/payments");
+      const res = await fetch(endpoint);
       const json: PaymentsResponse = await res.json();
       setData(json);
     } catch {
@@ -43,7 +47,7 @@ export default function DashboardClient({
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [endpoint]);
 
   useEffect(() => {
     // Initial fetch; the setState inside fetchPayments is intentionally
@@ -53,6 +57,8 @@ export default function DashboardClient({
   }, [fetchPayments]);
 
   useEffect(() => {
+    if (!enableRealtime) return;
+
     const supabase = createClient();
     const channel = supabase
       .channel(`payments-${organizationId}`)
@@ -76,7 +82,7 @@ export default function DashboardClient({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [organizationId, fetchPayments]);
+  }, [organizationId, fetchPayments, enableRealtime]);
 
   const payments = data?.payments ?? [];
 

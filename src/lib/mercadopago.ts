@@ -21,6 +21,13 @@ interface MpPayer {
   last_name?: string | null;
 }
 
+interface MpCollector {
+  id?: string | number | null;
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+}
+
 interface MpCard {
   cardholder?: { name?: string | null } | null;
 }
@@ -28,30 +35,93 @@ interface MpCard {
 export interface MpPayment {
   id: number;
   collector_id?: number | null;
+  payer_id?: number | null;
   external_reference?: string | null;
   transaction_amount: number;
   currency_id: string;
   status: string;
   payer?: MpPayer | null;
+  collector?: MpCollector | null;
   card?: MpCard | null;
+  point_of_interaction?: {
+    business_info?: {
+      sub_unit?: string | null;
+    } | null;
+  } | null;
   description?: string | null;
   date_created: string;
   date_approved?: string | null;
   date_last_updated: string;
+  operation_type?: string;
   payment_method_id?: string;
   payment_type_id?: string;
 }
 
+// export function isIncomingPayment(mp: MpPayment): boolean {
+//   return (
+//     mp.collector_id != null &&
+//     mp.payer?.id != null &&
+//     String(mp.collector_id) !== String(mp.payer.id)
+//   );
+// }
+//Bien pero considera incluso el dinero que me mando
 export function isIncomingPayment(mp: MpPayment): boolean {
-  return (
-    mp.collector_id != null &&
-    mp.payer?.id != null &&
-    String(mp.collector_id) !== String(mp.payer.id)
-  );
+  const payerId = mp.payer?.id != null ? String(mp.payer.id) : null;
+  const collectorId = mp.collector_id != null ? String(mp.collector_id) : null;
+
+  // 3. CASO ESPECIAL: Si por casualidad el pagador eres TÚ mismo 
+  // (como pasa en algunas acreditaciones de CVU externo donde el sistema te pone a ti de ambos lados),
+  // nos fijamos si operation_type o payment_type_id indica que es una plata que te mandaste de afuera.
+  if (payerId && collectorId && payerId === collectorId) {
+    // Si vino de una transferencia bancaria externa (CVU/CBU), es un ingreso legítimo tuyo.
+    if (mp.payment_type_id === 'bank_transfer' || mp.operation_type === 'account_fund') {
+      return true;
+    }
+    // Si es un auto-pago interno raro, lo descartamos
+    return false;
+  }
+
+  // 4. Si el pagador es otra persona distinta a ti, es un ingreso 100% seguro (transferencia de otro o cobro).
+  return true;
 }
+
+// export function isIncomingPayment(mp: MpPayment, myUserId: string = "216417742"): boolean {
+//   // 1. El monto debe ser mayor a 0
+//   if (mp.transaction_amount <= 0) return false;
+
+//   // 2. Descartar estados no deseados (rechazados, cancelados, etc.)
+//   const invalidStatuses = ['rejected', 'cancelled', 'refunded', 'charged_back'];
+//   if (invalidStatuses.includes(mp.status)) return false;
+
+//   const subUnit = mp.point_of_interaction?.business_info?.sub_unit;
+//   const operationType = mp.operation_type;
+//   const paymentTypeId = mp.payment_type_id;
+
+//   const payerId = mp.payer?.id != null ? String(mp.payer.id) : null;
+//   const collectorId = mp.collector_id != null ? String(mp.collector_id) : null;
+
+//   // 3. SI ES UNA TRANSFERENCIA BANCARIA / CVU ENTRANTE (Account Fund):
+//   // Aunque la API ponga tu ID en el payer por error o diseño interno, 
+//   // si vino de afuera hacia tu cuenta y el sub_unit NO es una salida, es un INGRESO.
+//   if (operationType === 'account_fund' || paymentTypeId === 'bank_transfer') {
+//     if (subUnit === 'money_outflows') return false;
+//     return true; // Es plata que te mandaron de afuera
+//   }
+
+//   // 4. PARA EL RESTO DE MOVIMIENTOS INTERNOS DE MP (ej. transferencias P2P comunes):
+//   // Acá sí validamos que si el pagador y el colector son exactamente el mismo ID, 
+//   // es porque te estás transfiriendo a ti mismo entre cuentas propias y lo descartamos.
+//   if (payerId && collectorId && payerId === collectorId) {
+//     return false;
+//   }
+
+//   // 5. Todo lo demás que llegue a tu collector_id es un ingreso válido
+//   return true;
+// }
 
 export interface NormalizedMpPayment {
   providerId: string;
+  payerId: string;
   amount: number;
   currency: string;
   status: PaymentStatus;
@@ -77,6 +147,7 @@ export function normalizeMpPayment(mp: MpPayment): NormalizedMpPayment {
 
   return {
     providerId: String(mp.id),
+    payerId: payerId,
     amount: mp.transaction_amount,
     currency: mp.currency_id,
     status: STATUS_MAP[mp.status] ?? "pending",
@@ -108,6 +179,32 @@ export async function fetchMercadoPagoPaymentById(
   }
 
   return res.json();
+}
+
+export async function searchMercadoPagoPayments(
+  accessToken: string,
+  params: { collectorId?: string; limit?: number; offset?: number } = {}
+): Promise<MpPayment[]> {
+  const url = new URL("https://api.mercadopago.com/v1/payments/search");
+  url.searchParams.set("sort", "date_created");
+  url.searchParams.set("criteria", "desc");
+  if (params.collectorId) {
+    url.searchParams.set("collector.id", params.collectorId);
+  }
+  url.searchParams.set("limit", String(params.limit ?? 50));
+  url.searchParams.set("offset", String(params.offset ?? 0));
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`Mercado Pago respondió ${res.status} al buscar pagos`);
+  }
+
+  const json: { results: MpPayment[] } = await res.json();
+  return json.results;
 }
 
 export async function getMercadoPagoCollectorId(

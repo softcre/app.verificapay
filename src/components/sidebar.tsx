@@ -15,7 +15,7 @@ import {
 import { UserRole } from "@/lib/database.types";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", icon: IconDashboard, href: "/" },
+  { label: "Dashboard", icon: IconDashboard, href: "/dashboard" },
   { label: "Pagos", icon: IconPayments, href: "/" },
   { label: "Reportes", icon: IconChart, href: "#" },
   { label: "Cajeros", icon: IconUsers, href: "#" },
