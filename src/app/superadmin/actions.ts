@@ -51,12 +51,17 @@ async function requireTargetOwner(ownerId: string) {
   if ("error" in auth) return auth;
 
   const service = createServiceClient();
-  const { data: owner } = await service
+  const { data: owner, error } = await service
     .from("profiles")
     .select("id, organization_id, role")
     .eq("id", ownerId)
     .maybeSingle();
 
+  if (error) {
+    console.error("Error buscando el dueño con service_role:", error);
+    return { error: "No se pudo verificar el dueño. Revisá la configuración del servidor." };
+  }
+  
   if (!owner || owner.role !== "owner") {
     return { error: "El dueño no existe o ya fue eliminado." };
   }
@@ -97,6 +102,7 @@ export async function createOwner(
     });
 
   if (createError || !created.user) {
+    console.error("Error creando el usuario del dueño:", createError);
     const alreadyExists = createError?.message
       ?.toLowerCase()
       .includes("already");
