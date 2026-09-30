@@ -1,10 +1,21 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { login, type AuthActionState } from "@/app/auth/actions";
 
 const initialState: AuthActionState = {};
+
+/** El proxy manda acá con ?suspendido=1 cuando el dueño suspendió al cajero. */
+function SuspendedNotice() {
+  if (useSearchParams().get("suspendido") !== "1") return null;
+  return (
+    <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2 mb-4">
+      Tu acceso fue suspendido por el dueño del comercio.
+    </p>
+  );
+}
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, initialState);
@@ -21,6 +32,10 @@ export default function LoginPage() {
             Iniciá sesión para verificar pagos
           </p>
         </div>
+
+        <Suspense fallback={null}>
+          <SuspendedNotice />
+        </Suspense>
 
         <form
           action={formAction}

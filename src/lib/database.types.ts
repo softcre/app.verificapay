@@ -1,4 +1,4 @@
-export type UserRole = "owner" | "employee";
+export type UserRole = "owner" | "employee" | "superadmin";
 export type WalletProvider =
   | "mercado_pago"
   | "naranja_x"
@@ -6,6 +6,7 @@ export type WalletProvider =
   | "cuenta_dni"
   | "modo";
 export type WalletStatus = "active" | "inactive" | "error";
+export type ProfileStatus = "active" | "inactive";
 
 export interface Organization {
   id: string;
@@ -18,8 +19,11 @@ export interface Profile {
   id: string;
   organization_id: string;
   full_name: string;
+  email: string | null;
   role: UserRole;
   shift: string | null;
+  status: ProfileStatus;
+  created_by: string | null;
   created_at: string;
 }
 
@@ -30,6 +34,7 @@ export interface Wallet {
   alias: string;
   public_key: string | null;
   access_token: string | null;
+  refresh_token: string | null;
   external_user_id: string | null;
   collector_id: string | null;
   status: WalletStatus;

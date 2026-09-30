@@ -4,28 +4,48 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   IconDashboard,
-  IconPayments,
   IconChart,
   IconUsers,
   IconSettings,
   IconShield,
   IconMenu,
   IconClose,
+  IconLogout,
 } from "./icons";
 import { UserRole } from "@/lib/database.types";
+import { logout } from "@/app/auth/actions";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", icon: IconDashboard, href: "/" },
-  { label: "Pagos", icon: IconPayments, href: "/" },
-  { label: "Reportes", icon: IconChart, href: "#" },
-  { label: "Cajeros", icon: IconUsers, href: "#" },
-  { label: "Seguridad", icon: IconShield, href: "#" },
-  { label: "Billeteras", icon: IconSettings, href: "/wallets" },
+  { label: "Pagos", icon: IconDashboard, href: "/dashboard", hideForSuperadmin: true },
+  { label: "Reportes", icon: IconChart, href: "#", hideForSuperadmin: true },
+  { label: "Cajeros", icon: IconUsers, href: "/cajeros", ownerOnly: true },
+  { label: "Seguridad", icon: IconShield, href: "#", hideForSuperadmin: true },
+  { label: "Billeteras", icon: IconSettings, href: "/wallets", hideForSuperadmin: true },
+  {
+    label: "Comercios",
+    icon: IconUsers,
+    href: "/superadmin",
+    superadminOnly: true,
+  },
 ];
 
-export default function Sidebar({ role }: { role?: UserRole }) {
+export default function Sidebar({
+  role,
+  userName,
+  userEmail,
+}: {
+  role?: UserRole;
+  userName?: string;
+  userEmail?: string | null;
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const navItems = NAV_ITEMS.filter((item) => {
+    if (item.superadminOnly) return role === "superadmin";
+    if (item.ownerOnly && role !== "owner") return false;
+    if (item.hideForSuperadmin && role === "superadmin") return false;
+    return true;
+  });
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -42,7 +62,7 @@ export default function Sidebar({ role }: { role?: UserRole }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.href === pathname;
           return (
@@ -62,18 +82,47 @@ export default function Sidebar({ role }: { role?: UserRole }) {
         })}
       </nav>
 
-      <div className="px-3 pb-4">
+      <div className="px-3 pb-4 space-y-2">
+        {(userName || userEmail) && (
+          <div className="px-3 py-3 rounded-lg bg-white/5 border border-white/10 min-w-0">
+            <p className="text-sm text-white font-medium truncate">
+              {userName}
+            </p>
+            {userEmail && (
+              <p className="text-[11px] text-sidebar-text truncate">
+                {userEmail}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="px-3 py-3 rounded-lg bg-white/5 border border-white/10">
           <p className="text-[11px] text-sidebar-text">
-            {role === "owner" ? "Rol" : "Plan Activo"}
+            {role === "owner" || role === "superadmin" ? "Rol" : "Plan Activo"}
           </p>
           <p className="text-sm text-white font-medium mt-0.5">
-            {role === "owner" ? "Dueño/a" : role === "employee" ? "Empleado/a" : "MVP — Beta"}
+            {role === "owner"
+              ? "Dueño/a"
+              : role === "employee"
+                ? "Empleado/a"
+                : role === "superadmin"
+                  ? "Superadmin"
+                  : "MVP — Beta"}
           </p>
           <div className="mt-2 w-full bg-white/10 rounded-full h-1.5">
             <div className="bg-primary h-1.5 rounded-full w-1/3" />
           </div>
         </div>
+
+        <form action={logout}>
+          <button
+            type="submit"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-sidebar-text text-sm hover:text-white hover:border-white/20 transition-colors"
+          >
+            <IconLogout className="w-4 h-4" />
+            Cerrar sesión
+          </button>
+        </form>
       </div>
     </div>
   );

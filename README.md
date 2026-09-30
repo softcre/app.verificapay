@@ -4,7 +4,7 @@ Dashboard para comercios que reciben pagos por billeteras virtuales (Mercado Pag
 
 ## Cómo funciona
 
-1. El dueño del comercio conecta su cuenta de Mercado Pago (u otra billetera) desde **Billeteras**, cargando el `access_token` de la API.
+1. El dueño del comercio conecta su cuenta de Mercado Pago desde **Billeteras** con OAuth (Authorization Code) — o, para otras billeteras, cargando el `access_token` manualmente.
 2. Mercado Pago manda un **webhook** a `/api/webhooks/mercadopago` cada vez que hay un movimiento de pago.
 3. El webhook busca el pago completo en la API de MP, valida que sea un ingreso real (no una autotransferencia) y lo guarda en la tabla `payments` de Supabase.
 4. El dashboard escucha esa tabla por **Supabase Realtime** y se actualiza solo apenas entra un pago nuevo. También hay un botón para actualizar manualmente.
@@ -21,7 +21,7 @@ Dashboard para comercios que reciben pagos por billeteras virtuales (Mercado Pag
 
 - **organizations**: cada comercio. Tiene un `invite_code` para que los empleados se sumen.
 - **profiles**: 1:1 con `auth.users`. Define `role` (`owner` | `employee`) y a qué organización pertenece.
-- **wallets**: billeteras conectadas por organización (`provider`, `access_token`, `collector_id`). `collector_id` es el `user_id` de Mercado Pago del dueño de la cuenta — se usa para matchear cada webhook con su organización.
+- **wallets**: billeteras conectadas por organización (`provider`, `access_token`, `refresh_token`, `collector_id`). `collector_id` es el `user_id` de Mercado Pago del dueño de la cuenta — se usa para matchear cada webhook con su organización.
 - **payments**: pagos recibidos, alimentados exclusivamente por el webhook. Guarda el payload crudo (`raw`) además de los campos normalizados.
 
 Todo el esquema (tablas, índices, RLS, función `current_organization_id()`, publicación de Realtime) está en [`supabase/schema.sql`](supabase/schema.sql) — es idempotente, se puede volver a correr entero en el SQL Editor de Supabase sin romper nada.
@@ -42,6 +42,8 @@ Completá con los datos de tu proyecto Supabase (Project Settings → API):
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project Settings → API |
 | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API (¡no exponer al cliente!) |
 | `MP_WEBHOOK_SECRET` | Panel de Mercado Pago → Tu aplicación → Webhooks → Configurar notificaciones → Clave secreta |
+| `MP_CLIENT_ID` / `MP_CLIENT_SECRET` | Panel de Mercado Pago → Tu aplicación → Detalles de aplicación (credenciales OAuth) |
+| `NEXT_PUBLIC_SITE_URL` | URL pública de esta app (sin barra final), p. ej. `http://localhost:3000` |
 
 ### 2. Base de datos
 
@@ -66,13 +68,26 @@ Crea un comercio de prueba con un usuario `owner` y uno `employee` (las credenci
 
 ### 5. Conectar Mercado Pago y probar el webhook
 
-1. Logueate como owner y entrá a **Billeteras** → agregá una wallet `Mercado Pago` con un `access_token` de prueba (cuenta de test de MP). Al guardarla, la app resuelve automáticamente el `collector_id` contra la API de MP.
-2. Mercado Pago necesita poder pegarle a tu `/api/webhooks/mercadopago` desde internet. En local, exponé el puerto 3000 con un túnel (por ejemplo la pestaña **Ports** de VS Code, ngrok, o cloudflared).
-3. Si accedés a la app por un dominio de túnel distinto de `localhost`, agregalo a `serverActions.allowedOrigins` en [`next.config.ts`](next.config.ts) — si no, el login y otras Server Actions van a fallar con "Invalid Server Actions request".
-4. Cargá esa URL pública (`https://.../api/webhooks/mercadopago`) en el panel de Mercado Pago, en Webhooks, para el evento **Pagos**.
-5. Generá un pago real en la cuenta de test (Checkout Pro, transferencia/CVU, etc.). Debería aparecer solo en el dashboard.
+1. En el panel de Mercado Pago, en tu aplicación, cargá la **URL de redirect** de OAuth: `<NEXT_PUBLIC_SITE_URL>/api/mercadopago/oauth/callback` (p. ej. `http://localhost:3000/api/mercadopago/oauth/callback`).
+2. Logueate como owner y entrá a **Billeteras** → **Conectar con Mercado Pago**. Te redirige a Mercado Pago para autorizar el acceso (flujo OAuth *Authorization Code*, sin PKCE porque el canje del `code` por el `access_token` se hace server-to-server) y vuelve a `/wallets` con la wallet ya creada, incluyendo `access_token`, `refresh_token` y `collector_id`.
+3. Mercado Pago necesita poder pegarle a tu `/api/webhooks/mercadopago` desde internet. En local, exponé el puerto 3000 con un túnel (por ejemplo la pestaña **Ports** de VS Code, ngrok, o cloudflared).
+4. Si accedés a la app por un dominio de túnel distinto de `localhost`, agregalo a `serverActions.allowedOrigins` en [`next.config.ts`](next.config.ts) y actualizá `NEXT_PUBLIC_SITE_URL` / la URL de redirect de OAuth en el panel de MP — si no, el login y otras Server Actions van a fallar con "Invalid Server Actions request".
+5. Cargá esa URL pública (`https://.../api/webhooks/mercadopago`) en el panel de Mercado Pago, en Webhooks, para el evento **Pagos**.
+6. Generá un pago real en la cuenta de test (Checkout Pro, transferencia/CVU, etc.). Debería aparecer solo en el dashboard.
 
 > El simulador de notificaciones del panel de MP manda un `payment.id` que no existe de verdad — sirve para validar que la firma y la URL responden, pero no va a insertar un pago real en la tabla.
+
+## Deploy en Vercel
+
+1. Importá el repo en [vercel.com/new](https://vercel.com/new). Framework: **Next.js** (se detecta solo). Si el repo tiene la app en una subcarpeta, configurá **Root Directory** apuntando a ella.
+2. En **Settings → Environment Variables** cargá las mismas variables que en `.env.local` (ver tabla de arriba). `NEXT_PUBLIC_SITE_URL` debe ser el dominio de producción, p. ej. `https://verificapay.vercel.app` — si no la cargás, se usa el dominio de producción que expone Vercel (`VERCEL_PROJECT_PRODUCTION_URL`). Las variables `NEXT_PUBLIC_*` se embeben en el build: si las cambiás, hay que redeployar.
+3. Deployá.
+4. En el panel de Mercado Pago, actualizá:
+   - **URL de redirect** de OAuth: `https://<tu-dominio>/api/mercadopago/oauth/callback`
+   - **Webhooks** (evento Pagos): `https://<tu-dominio>/api/webhooks/mercadopago`
+5. En Supabase → **Authentication → URL Configuration**, poné tu dominio de Vercel como **Site URL** (y agregalo a Redirect URLs).
+
+> Los *preview deployments* tienen otra URL, así que el flujo OAuth de Mercado Pago solo funciona en el dominio de producción (el que está registrado en MP).
 
 ## Estructura del proyecto
 
@@ -82,6 +97,7 @@ src/
     api/
       payments/            GET — pagos de la organización (o mock si no hay wallet conectada)
       webhooks/mercadopago/ POST — recibe notificaciones de Mercado Pago
+      mercadopago/oauth/    GET start/callback — flujo OAuth Authorization Code para vincular la cuenta
     auth/actions.ts         Server Actions de login/signup/logout
     login/, signup/         Páginas públicas
     wallets/                Alta/baja de billeteras (solo owner)
@@ -98,6 +114,7 @@ scripts/seed-users.mjs       Seed de comercio + usuarios de prueba
 
 ## Notas de seguridad
 
-- `wallets.access_token` se guarda en texto plano — para producción, cifrarlo o usar Supabase Vault (ver nota al final de `schema.sql`).
+- `wallets.access_token` y `wallets.refresh_token` se guardan en texto plano — para producción, cifrarlos o usar Supabase Vault (ver nota al final de `schema.sql`).
+- El flujo OAuth valida el parámetro `state` contra una cookie `httpOnly` de un solo uso para evitar CSRF; `MP_CLIENT_SECRET` nunca se expone al cliente, el canje del `code` se hace server-to-server en `/api/mercadopago/oauth/callback`.
 - El webhook valida la firma de Mercado Pago (`x-signature`) contra `MP_WEBHOOK_SECRET` si está configurada; sin ese secret, no rechaza nada.
 - La `service_role` key solo se usa server-side (webhook), nunca se expone al cliente.

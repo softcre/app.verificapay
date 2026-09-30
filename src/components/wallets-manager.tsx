@@ -25,14 +25,24 @@ const PROVIDERS: WalletProvider[] = [
 
 const initialState: WalletActionState = {};
 
+const MP_ERROR_MESSAGES: Record<string, string> = {
+  solo_owner: "Solo el dueño del comercio puede conectar billeteras.",
+  estado_invalido: "La conexión con Mercado Pago expiró o no es válida. Probá de nuevo.",
+  sesion_expirada: "Tu sesión expiró. Volvé a iniciar sesión e intentá de nuevo.",
+  canje_fallido: "No se pudo validar la autorización con Mercado Pago.",
+  guardado_fallido: "No se pudo guardar la conexión con Mercado Pago.",
+};
+
 export default function WalletsManager({
   wallets,
   role,
   inviteCode,
+  mpNotice,
 }: {
   wallets: Wallet[];
   role: UserRole;
   inviteCode: string;
+  mpNotice?: { connected?: boolean; error?: string };
 }) {
   const [state, formAction, pending] = useActionState(
     addWallet,
@@ -42,6 +52,18 @@ export default function WalletsManager({
 
   return (
     <div className="max-w-3xl space-y-6">
+      {mpNotice?.connected && (
+        <p className="text-sm text-green-800 bg-success-bg rounded-lg px-3 py-2">
+          Tu cuenta de Mercado Pago se conectó correctamente.
+        </p>
+      )}
+      {mpNotice?.error && (
+        <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+          {MP_ERROR_MESSAGES[mpNotice.error] ??
+            "No se pudo conectar con Mercado Pago."}
+        </p>
+      )}
+
       {isOwner && (
         <div className="bg-card border border-card-border rounded-xl p-4">
           <p className="text-xs text-muted">Código de invitación para empleados</p>
@@ -85,8 +107,26 @@ export default function WalletsManager({
 
       {isOwner && (
         <div className="bg-card border border-card-border rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-1">
+            Conectar Mercado Pago
+          </h3>
+          <p className="text-sm text-muted mb-3">
+            Vinculá tu cuenta de Mercado Pago para que VerificaPay lea tus
+            pagos automáticamente, sin tener que copiar ningún token.
+          </p>
+          <a
+            href="/api/mercadopago/oauth/start"
+            className="inline-flex items-center px-4 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-sm font-medium transition-colors"
+          >
+            Conectar con Mercado Pago
+          </a>
+        </div>
+      )}
+
+      {isOwner && (
+        <div className="bg-card border border-card-border rounded-xl p-5">
           <h3 className="text-sm font-semibold text-foreground mb-3">
-            Agregar billetera
+            Agregar billetera manualmente
           </h3>
           <form action={formAction} className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
