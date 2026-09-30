@@ -42,7 +42,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isPublicRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/pagos";
     return NextResponse.redirect(url);
   }
 

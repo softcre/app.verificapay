@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { generateMockPayments } from "@/lib/mock-data";
 import { DbPayment, WALLET_PROVIDER_LABELS } from "@/lib/database.types";
 import { PaymentsResponse } from "@/lib/types";
 
@@ -30,7 +29,7 @@ export async function GET() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return Response.json(generateMockPayments(20));
+    return Response.json({ error: "No autenticado" }, { status: 401 });
   }
 
   const { data: profile } = await supabase
@@ -40,7 +39,7 @@ export async function GET() {
     .single();
 
   if (!profile) {
-    return Response.json(generateMockPayments(20));
+    return Response.json({ error: "Perfil no encontrado" }, { status: 403 });
   }
 
   const { data: wallet } = await supabase
@@ -53,7 +52,16 @@ export async function GET() {
     .maybeSingle();
 
   if (!wallet) {
-    return Response.json(generateMockPayments(20));
+    // Sin billetera conectada no hay pagos: nunca se devuelven datos de ejemplo.
+    const response: PaymentsResponse = {
+      payments: [],
+      total: 0,
+      lastSync: new Date().toISOString(),
+      connectionStatus: "disconnected",
+      branchName: "",
+      currentShift: "",
+    };
+    return Response.json(response);
   }
 
   const { data: rows } = await supabase

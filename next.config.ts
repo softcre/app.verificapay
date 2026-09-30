@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
       allowedOrigins: ["localhost:3000", "**.devtunnels.ms"],
     },
   },
+  async redirects() {
+    // La vista de pagos vivía en /dashboard; se mantiene el redirect para
+    // links y marcadores viejos.
+    return [{ source: "/dashboard", destination: "/pagos", permanent: true }];
+  },
 };
 
 export default nextConfig;

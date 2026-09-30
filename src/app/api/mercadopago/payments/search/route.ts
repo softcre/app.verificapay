@@ -1,10 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
-import { generateMockPayments } from "@/lib/mock-data";
 import { WALLET_PROVIDER_LABELS } from "@/lib/database.types";
 import { PaymentsResponse } from "@/lib/types";
 import { normalizeMpPayment, searchMercadoPagoPayments } from "@/lib/mercadopago";
 
 export const dynamic = "force-dynamic";
+
+// Nunca se devuelven pagos de ejemplo: sin billetera o ante un error, la
+// lista queda vacía para no confundir al cajero.
+function emptyResponse(): PaymentsResponse {
+  return {
+    payments: [],
+    total: 0,
+    lastSync: new Date().toISOString(),
+    connectionStatus: "disconnected",
+    branchName: "",
+    currentShift: "",
+  };
+}
 
 export async function GET() {
   const supabase = await createClient();
@@ -14,7 +26,7 @@ export async function GET() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return Response.json(generateMockPayments(20));
+    return Response.json({ error: "No autenticado" }, { status: 401 });
   }
 
   const { data: profile } = await supabase
@@ -24,7 +36,7 @@ export async function GET() {
     .single();
 
   if (!profile) {
-    return Response.json(generateMockPayments(20));
+    return Response.json({ error: "Perfil no encontrado" }, { status: 403 });
   }
 
   const { data: wallet } = await supabase
@@ -37,7 +49,7 @@ export async function GET() {
     .maybeSingle();
 
   if (!wallet?.access_token) {
-    return Response.json(generateMockPayments(20));
+    return Response.json(emptyResponse());
   }
 
   try {
@@ -77,14 +89,6 @@ export async function GET() {
     return Response.json(response);
   } catch (err) {
     console.error("Error buscando pagos en Mercado Pago:", err);
-    const response: PaymentsResponse = {
-      payments: [],
-      total: 0,
-      lastSync: new Date().toISOString(),
-      connectionStatus: "disconnected",
-      branchName: "",
-      currentShift: "",
-    };
-    return Response.json(response);
+    return Response.json(emptyResponse());
   }
 }

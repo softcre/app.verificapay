@@ -95,19 +95,20 @@ Crea un comercio de prueba con un usuario `owner` y uno `employee` (las credenci
 src/
   app/
     api/
-      payments/            GET — pagos de la organización (o mock si no hay wallet conectada)
+      payments/            GET — pagos de la organización guardados por el webhook (vacío si no hay wallet conectada)
+      mercadopago/payments/search/ GET — pagos consultados en vivo a Mercado Pago (los usa /pagos)
       webhooks/mercadopago/ POST — recibe notificaciones de Mercado Pago
       mercadopago/oauth/    GET start/callback — flujo OAuth Authorization Code para vincular la cuenta
     auth/actions.ts         Server Actions de login/signup/logout
     login/, signup/         Páginas públicas
     wallets/                Alta/baja de billeteras (solo owner)
-    page.tsx                Dashboard principal
+    pagos/                  Vista de pagos (pide asociar una billetera si no hay ninguna activa)
+    page.tsx                Redirige a /pagos
   components/                UI (dashboard, lista de pagos, sidebar, etc.)
   lib/
     mercadopago.ts           Cliente de la API de MP + validación de firma del webhook
     supabase/                Clientes de Supabase: browser, server (cookies), service (webhook)
     database.types.ts        Tipos de las tablas
-    mock-data.ts             Generador de pagos falsos (fallback sin wallet conectada)
 supabase/schema.sql          Esquema completo de la base
 scripts/seed-users.mjs       Seed de comercio + usuarios de prueba
 ```
