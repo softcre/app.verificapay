@@ -77,6 +77,18 @@ Crea un comercio de prueba con un usuario `owner` y uno `employee` (las credenci
 
 > El simulador de notificaciones del panel de MP manda un `payment.id` que no existe de verdad — sirve para validar que la firma y la URL responden, pero no va a insertar un pago real en la tabla.
 
+## Deploy en Vercel
+
+1. Importá el repo en [vercel.com/new](https://vercel.com/new). Framework: **Next.js** (se detecta solo). Si el repo tiene la app en una subcarpeta, configurá **Root Directory** apuntando a ella.
+2. En **Settings → Environment Variables** cargá las mismas variables que en `.env.local` (ver tabla de arriba). `NEXT_PUBLIC_SITE_URL` debe ser el dominio de producción, p. ej. `https://verificapay.vercel.app` — si no la cargás, se usa el dominio de producción que expone Vercel (`VERCEL_PROJECT_PRODUCTION_URL`). Las variables `NEXT_PUBLIC_*` se embeben en el build: si las cambiás, hay que redeployar.
+3. Deployá.
+4. En el panel de Mercado Pago, actualizá:
+   - **URL de redirect** de OAuth: `https://<tu-dominio>/api/mercadopago/oauth/callback`
+   - **Webhooks** (evento Pagos): `https://<tu-dominio>/api/webhooks/mercadopago`
+5. En Supabase → **Authentication → URL Configuration**, poné tu dominio de Vercel como **Site URL** (y agregalo a Redirect URLs).
+
+> Los *preview deployments* tienen otra URL, así que el flujo OAuth de Mercado Pago solo funciona en el dominio de producción (el que está registrado en MP).
+
 ## Estructura del proyecto
 
 ```
