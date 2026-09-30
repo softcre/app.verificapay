@@ -29,10 +29,11 @@ export default async function PagosPage() {
 
   const { data: wallet } = await supabase
     .from("wallets")
-    .select("id")
+    .select("status")
     .eq("organization_id", profile.organization_id)
     .eq("provider", "mercado_pago")
-    .eq("status", "active")
+    .in("status", ["active", "error"])
+    .order("status") // "active" antes que "error"
     .limit(1)
     .maybeSingle();
 
@@ -47,9 +48,12 @@ export default async function PagosPage() {
       shift={profile.shift}
       role={profile.role}
       organizationId={profile.organization_id}
-      hasWallet={Boolean(wallet)}
+      walletState={
+        !wallet ? "missing" : wallet.status === "error" ? "reconnect" : "ok"
+      }
       endpoint="/api/mercadopago/payments/search"
       enableRealtime={false}
+      pollIntervalMs={30_000}
     />
   );
 }

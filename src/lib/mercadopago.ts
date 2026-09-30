@@ -165,6 +165,10 @@ export function normalizeMpPayment(mp: MpPayment): NormalizedMpPayment {
   };
 }
 
+// MP responde 401 cuando el access token venció o fue revocado; se distingue
+// del resto de los errores para poder renovarlo con el refresh token.
+export class MercadoPagoAuthError extends Error {}
+
 export async function fetchMercadoPagoPaymentById(
   accessToken: string,
   paymentId: string
@@ -174,6 +178,9 @@ export async function fetchMercadoPagoPaymentById(
     cache: "no-store",
   });
 
+  if (res.status === 401) {
+    throw new MercadoPagoAuthError("Mercado Pago rechazó el access token");
+  }
   if (!res.ok) {
     throw new Error(`Mercado Pago respondió ${res.status} al pedir el pago ${paymentId}`);
   }
@@ -199,6 +206,9 @@ export async function searchMercadoPagoPayments(
     cache: "no-store",
   });
 
+  if (res.status === 401) {
+    throw new MercadoPagoAuthError("Mercado Pago rechazó el access token");
+  }
   if (!res.ok) {
     throw new Error(`Mercado Pago respondió ${res.status} al buscar pagos`);
   }
@@ -277,6 +287,34 @@ export async function exchangeMercadoPagoOAuthCode(params: {
 
   if (!res.ok) {
     throw new Error(`Mercado Pago respondió ${res.status} al canjear el code por un access token`);
+  }
+
+  return res.json();
+}
+
+export async function refreshMercadoPagoToken(
+  refreshToken: string
+): Promise<MpOAuthTokens> {
+  const clientId = process.env.MP_CLIENT_ID;
+  const clientSecret = process.env.MP_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error("Falta configurar MP_CLIENT_ID / MP_CLIENT_SECRET.");
+  }
+
+  const res = await fetch("https://api.mercadopago.com/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`Mercado Pago respondió ${res.status} al renovar el access token`);
   }
 
   return res.json();

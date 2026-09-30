@@ -1,7 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { WALLET_PROVIDER_LABELS } from "@/lib/database.types";
 import { PaymentsResponse } from "@/lib/types";
-import { normalizeMpPayment, searchMercadoPagoPayments } from "@/lib/mercadopago";
+import {
+  MercadoPagoAuthError,
+  normalizeMpPayment,
+  searchMercadoPagoPayments,
+} from "@/lib/mercadopago";
+import { withMercadoPagoToken } from "@/lib/mercadopago-wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +46,7 @@ export async function GET() {
 
   const { data: wallet } = await supabase
     .from("wallets")
-    .select("id, access_token, collector_id")
+    .select("id, access_token, refresh_token, collector_id")
     .eq("organization_id", profile.organization_id)
     .eq("provider", "mercado_pago")
     .eq("status", "active")
@@ -53,10 +58,14 @@ export async function GET() {
   }
 
   try {
-    const mpPayments = await searchMercadoPagoPayments(wallet.access_token, {
-      collectorId: wallet.collector_id ?? undefined,
-      limit: 50,
-    });
+    const mpPayments = await withMercadoPagoToken(
+      { ...wallet, access_token: wallet.access_token },
+      (accessToken) =>
+        searchMercadoPagoPayments(accessToken, {
+          collectorId: wallet.collector_id ?? undefined,
+          limit: 50,
+        })
+    );
 
     const payments = mpPayments
       .map(normalizeMpPayment)
@@ -89,6 +98,9 @@ export async function GET() {
     return Response.json(response);
   } catch (err) {
     console.error("Error buscando pagos en Mercado Pago:", err);
-    return Response.json(emptyResponse());
+    return Response.json({
+      ...emptyResponse(),
+      needsReconnect: err instanceof MercadoPagoAuthError,
+    });
   }
 }
