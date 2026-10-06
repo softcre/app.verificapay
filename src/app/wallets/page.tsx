@@ -35,7 +35,10 @@ export default async function WalletsPage({
 
   const { data: wallets } = await supabase
     .from("wallets")
-    .select("*")
+    // Columnas explícitas: todo lo que se lee acá termina en el navegador.
+    .select(
+      "id, organization_id, provider, alias, public_key, external_user_id, collector_id, status, connected_by, created_at, updated_at"
+    )
     .order("created_at", { ascending: false });
 
   const org = profile.organizations as unknown as {

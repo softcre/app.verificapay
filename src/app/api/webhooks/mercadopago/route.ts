@@ -42,19 +42,18 @@ export async function POST(req: Request) {
 
   const { data: wallet } = await supabase
     .from("wallets")
-    .select("id, organization_id, access_token, refresh_token")
+    .select("id, organization_id")
     .eq("provider", "mercado_pago")
     .eq("collector_id", collectorId)
     .maybeSingle();
 
-  if (!wallet?.access_token) {
+  if (!wallet) {
     return Response.json({ received: true });
   }
 
   try {
-    const mpPayment = await withMercadoPagoToken(
-      { ...wallet, access_token: wallet.access_token },
-      (accessToken) => fetchMercadoPagoPaymentById(accessToken, dataId)
+    const mpPayment = await withMercadoPagoToken(wallet.id, (accessToken) =>
+      fetchMercadoPagoPaymentById(accessToken, dataId)
     );
     const normalized = normalizeMpPayment(mpPayment);
 

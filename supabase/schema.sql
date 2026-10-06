@@ -56,8 +56,6 @@ create table if not exists public.wallets (
   provider text not null check (provider in ('mercado_pago', 'naranja_x', 'uala', 'cuenta_dni', 'modo')),
   alias text not null,
   public_key text,
-  access_token text, -- almacenar cifrado en producción (ver nota de seguridad al final)
-  refresh_token text, -- token OAuth para renovar el access_token cuando expire
   external_user_id text,
   collector_id text, -- user_id de MP (u otro proveedor) dueño de la cuenta; usado para matchear webhooks
   status text not null default 'active' check (status in ('active', 'inactive', 'error')),
@@ -66,8 +64,42 @@ create table if not exists public.wallets (
   updated_at timestamptz not null default now()
 );
 
--- Delta idempotente para bases ya creadas antes de sumar OAuth:
-alter table public.wallets add column if not exists refresh_token text;
+-- ============================================================
+-- WALLET_CREDENTIALS (tokens de las billeteras)
+-- ============================================================
+-- Tabla aparte para que los tokens nunca lleguen al navegador: tiene RLS
+-- activado y ninguna policy, así que solo la service_role key (server-side)
+-- puede leerla o escribirla. Los cajeros pueden ver `wallets`, no esto.
+create table if not exists public.wallet_credentials (
+  wallet_id uuid primary key references public.wallets(id) on delete cascade,
+  access_token text, -- almacenar cifrado en producción (ver nota de seguridad al final)
+  refresh_token text, -- token OAuth para renovar el access_token cuando expire
+  updated_at timestamptz not null default now()
+);
+
+alter table public.wallet_credentials enable row level security;
+revoke all on public.wallet_credentials from anon, authenticated;
+
+-- Delta idempotente para bases ya creadas con los tokens dentro de wallets:
+-- los mueve a wallet_credentials y borra las columnas expuestas.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'wallets' and column_name = 'access_token'
+  ) then
+    alter table public.wallets add column if not exists refresh_token text;
+
+    insert into public.wallet_credentials (wallet_id, access_token, refresh_token)
+      select id, access_token, refresh_token
+      from public.wallets
+      where access_token is not null or refresh_token is not null
+    on conflict (wallet_id) do nothing;
+
+    alter table public.wallets drop column access_token;
+    alter table public.wallets drop column refresh_token;
+  end if;
+end $$;
 
 create index if not exists wallets_organization_id_idx on public.wallets(organization_id);
 create unique index if not exists wallets_collector_id_idx on public.wallets(provider, collector_id) where collector_id is not null;
@@ -83,6 +115,11 @@ $$ language plpgsql;
 drop trigger if exists wallets_set_updated_at on public.wallets;
 create trigger wallets_set_updated_at
   before update on public.wallets
+  for each row execute function public.set_updated_at();
+
+drop trigger if exists wallet_credentials_set_updated_at on public.wallet_credentials;
+create trigger wallet_credentials_set_updated_at
+  before update on public.wallet_credentials
   for each row execute function public.set_updated_at();
 
 -- ============================================================
@@ -113,7 +150,16 @@ create index if not exists payments_organization_id_idx on public.payments(organ
 
 -- Habilita Supabase Realtime sobre payments para que el dashboard se
 -- actualice solo cuando el webhook inserta un pago nuevo.
-alter publication supabase_realtime add table public.payments;
+-- (Idempotente: agregar una tabla que ya está en la publicación da error.)
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'payments'
+  ) then
+    alter publication supabase_realtime add table public.payments;
+  end if;
+end $$;
 
 drop trigger if exists payments_set_updated_at on public.payments;
 create trigger payments_set_updated_at
@@ -292,8 +338,7 @@ create policy "payments: select all (superadmin)"
 -- ============================================================
 -- NOTA DE SEGURIDAD
 -- ============================================================
--- El campo wallets.access_token guarda el token de la API de Mercado Pago
--- (u otra billetera). Para producción, no lo guardes en texto plano:
--- usá Supabase Vault, o cifralo en una Edge Function antes de persistirlo,
--- y nunca lo expongas al cliente (leelo solo desde el service_role en
--- funciones server-side).
+-- wallet_credentials guarda los tokens de la API de Mercado Pago (u otra
+-- billetera). Solo se accede desde el server con la service_role key y nunca
+-- se expone al cliente. Para producción, además, no los guardes en texto
+-- plano: usá Supabase Vault, o cifralos antes de persistirlos.

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { exchangeMercadoPagoOAuthCode } from "@/lib/mercadopago";
+import { saveWalletCredentials } from "@/lib/mercadopago-wallet";
 import {
   getMercadoPagoRedirectUri,
   getSiteUrl,
@@ -73,18 +74,32 @@ export async function GET(req: Request) {
     provider: "mercado_pago" as const,
     alias: "Mercado Pago",
     public_key: tokens.public_key ?? null,
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token ?? null,
     collector_id: collectorId,
     status: "active" as const,
     connected_by: user.id,
   };
 
-  const { error } = existing
-    ? await supabase.from("wallets").update(walletData).eq("id", existing.id)
-    : await supabase.from("wallets").insert(walletData);
+  // La escritura en `wallets` pasa por RLS (solo el owner); recién con eso
+  // confirmado se guardan los tokens con la service key.
+  const { data: wallet, error } = existing
+    ? await supabase
+        .from("wallets")
+        .update(walletData)
+        .eq("id", existing.id)
+        .select("id")
+        .single()
+    : await supabase.from("wallets").insert(walletData).select("id").single();
 
-  if (error) {
+  if (error || !wallet) {
+    return redirectToWallets("?mp_error=guardado_fallido");
+  }
+
+  const { error: credentialsError } = await saveWalletCredentials(wallet.id, {
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token ?? null,
+  });
+
+  if (credentialsError) {
     return redirectToWallets("?mp_error=guardado_fallido");
   }
 

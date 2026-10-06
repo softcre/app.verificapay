@@ -46,21 +46,21 @@ export async function GET() {
 
   const { data: wallet } = await supabase
     .from("wallets")
-    .select("id, access_token, refresh_token, collector_id")
+    .select("id, collector_id")
     .eq("organization_id", profile.organization_id)
     .eq("provider", "mercado_pago")
     .eq("status", "active")
     .limit(1)
     .maybeSingle();
 
-  if (!wallet?.access_token) {
+  if (!wallet) {
     return Response.json(emptyResponse());
   }
 
   try {
-    const mpPayments = await withMercadoPagoToken(
-      { ...wallet, access_token: wallet.access_token },
-      (accessToken) =>
+    // La billetera se leyó con el cliente del usuario (RLS), así que ya está
+    // verificado que pertenece a su comercio antes de usar sus credenciales.
+    const mpPayments = await withMercadoPagoToken(wallet.id, (accessToken) =>
         searchMercadoPagoPayments(accessToken, {
           collectorId: wallet.collector_id ?? undefined,
           limit: 50,
