@@ -4,6 +4,7 @@ import {
   normalizeMpPayment,
   verifyMercadoPagoSignature,
 } from "@/lib/mercadopago";
+import { withMercadoPagoToken } from "@/lib/mercadopago-wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -41,19 +42,18 @@ export async function POST(req: Request) {
 
   const { data: wallet } = await supabase
     .from("wallets")
-    .select("id, organization_id, access_token")
+    .select("id, organization_id")
     .eq("provider", "mercado_pago")
     .eq("collector_id", collectorId)
     .maybeSingle();
 
-  if (!wallet?.access_token) {
+  if (!wallet) {
     return Response.json({ received: true });
   }
 
   try {
-    const mpPayment = await fetchMercadoPagoPaymentById(
-      wallet.access_token,
-      dataId
+    const mpPayment = await withMercadoPagoToken(wallet.id, (accessToken) =>
+      fetchMercadoPagoPaymentById(accessToken, dataId)
     );
     const normalized = normalizeMpPayment(mpPayment);
 

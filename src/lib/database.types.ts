@@ -33,8 +33,6 @@ export interface Wallet {
   provider: WalletProvider;
   alias: string;
   public_key: string | null;
-  access_token: string | null;
-  refresh_token: string | null;
   external_user_id: string | null;
   collector_id: string | null;
   status: WalletStatus;

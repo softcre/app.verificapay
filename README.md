@@ -21,7 +21,8 @@ Dashboard para comercios que reciben pagos por billeteras virtuales (Mercado Pag
 
 - **organizations**: cada comercio. Tiene un `invite_code` para que los empleados se sumen.
 - **profiles**: 1:1 con `auth.users`. Define `role` (`owner` | `employee`) y a qué organización pertenece.
-- **wallets**: billeteras conectadas por organización (`provider`, `access_token`, `refresh_token`, `collector_id`). `collector_id` es el `user_id` de Mercado Pago del dueño de la cuenta — se usa para matchear cada webhook con su organización.
+- **wallets**: billeteras conectadas por organización (`provider`, `alias`, `status`, `collector_id`).
+- **wallet_credentials**: `access_token` y `refresh_token` de cada billetera. Tiene RLS sin policies: solo el server la lee/escribe con la service key, nunca llega al navegador. `collector_id` es el `user_id` de Mercado Pago del dueño de la cuenta — se usa para matchear cada webhook con su organización.
 - **payments**: pagos recibidos, alimentados exclusivamente por el webhook. Guarda el payload crudo (`raw`) además de los campos normalizados.
 
 Todo el esquema (tablas, índices, RLS, función `current_organization_id()`, publicación de Realtime) está en [`supabase/schema.sql`](supabase/schema.sql) — es idempotente, se puede volver a correr entero en el SQL Editor de Supabase sin romper nada.
@@ -95,26 +96,27 @@ Crea un comercio de prueba con un usuario `owner` y uno `employee` (las credenci
 src/
   app/
     api/
-      payments/            GET — pagos de la organización (o mock si no hay wallet conectada)
+      payments/            GET — pagos de la organización guardados por el webhook (vacío si no hay wallet conectada)
+      mercadopago/payments/search/ GET — pagos consultados en vivo a Mercado Pago (los usa /pagos)
       webhooks/mercadopago/ POST — recibe notificaciones de Mercado Pago
       mercadopago/oauth/    GET start/callback — flujo OAuth Authorization Code para vincular la cuenta
     auth/actions.ts         Server Actions de login/signup/logout
     login/, signup/         Páginas públicas
     wallets/                Alta/baja de billeteras (solo owner)
-    page.tsx                Dashboard principal
+    pagos/                  Vista de pagos (pide asociar una billetera si no hay ninguna activa)
+    page.tsx                Redirige a /pagos
   components/                UI (dashboard, lista de pagos, sidebar, etc.)
   lib/
     mercadopago.ts           Cliente de la API de MP + validación de firma del webhook
     supabase/                Clientes de Supabase: browser, server (cookies), service (webhook)
     database.types.ts        Tipos de las tablas
-    mock-data.ts             Generador de pagos falsos (fallback sin wallet conectada)
 supabase/schema.sql          Esquema completo de la base
 scripts/seed-users.mjs       Seed de comercio + usuarios de prueba
 ```
 
 ## Notas de seguridad
 
-- `wallets.access_token` y `wallets.refresh_token` se guardan en texto plano — para producción, cifrarlos o usar Supabase Vault (ver nota al final de `schema.sql`).
+- Los tokens de `wallet_credentials` solo se acceden server-side (ver `src/lib/mercadopago-wallet.ts`); si Mercado Pago rechaza el `access_token`, se renueva solo con el `refresh_token`. Todavía se guardan en texto plano — para producción, cifrarlos o usar Supabase Vault (ver nota al final de `schema.sql`).
 - El flujo OAuth valida el parámetro `state` contra una cookie `httpOnly` de un solo uso para evitar CSRF; `MP_CLIENT_SECRET` nunca se expone al cliente, el canje del `code` se hace server-to-server en `/api/mercadopago/oauth/callback`.
 - El webhook valida la firma de Mercado Pago (`x-signature`) contra `MP_WEBHOOK_SECRET` si está configurada; sin ese secret, no rechaza nada.
 - La `service_role` key solo se usa server-side (webhook), nunca se expone al cliente.

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { WalletProvider } from "@/lib/database.types";
 import { getMercadoPagoCollectorId } from "@/lib/mercadopago";
+import { saveWalletCredentials } from "@/lib/mercadopago-wallet";
 
 export interface WalletActionState {
   error?: string;
@@ -45,18 +46,34 @@ export async function addWallet(
     }
   }
 
-  const { error } = await supabase.from("wallets").insert({
-    organization_id: profile.organization_id,
-    provider,
-    alias,
-    public_key: publicKey || null,
-    access_token: accessToken || null,
-    collector_id: collectorId,
-    connected_by: user.id,
-  });
+  // El insert pasa por RLS (solo el owner); recién con eso confirmado se
+  // guarda el token con la service key.
+  const { data: wallet, error } = await supabase
+    .from("wallets")
+    .insert({
+      organization_id: profile.organization_id,
+      provider,
+      alias,
+      public_key: publicKey || null,
+      collector_id: collectorId,
+      connected_by: user.id,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !wallet) {
     return { error: "No se pudo agregar la billetera." };
+  }
+
+  if (accessToken) {
+    const { error: credentialsError } = await saveWalletCredentials(wallet.id, {
+      access_token: accessToken,
+      refresh_token: null,
+    });
+    if (credentialsError) {
+      await supabase.from("wallets").delete().eq("id", wallet.id);
+      return { error: "No se pudo guardar el access token." };
+    }
   }
 
   revalidatePath("/wallets");

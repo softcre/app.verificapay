@@ -27,7 +27,7 @@ export default async function SuperadminPage() {
 
   // El módulo es exclusivo del superadmin: un owner o cajero no administra comercios ajenos.
   if (profile.role !== "superadmin") {
-    redirect("/dashboard");
+    redirect("/pagos");
   }
 
   const { data: owners } = await supabase

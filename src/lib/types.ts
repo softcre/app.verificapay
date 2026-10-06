@@ -22,6 +22,8 @@ export interface PaymentsResponse {
   connectionStatus: "connected" | "disconnected" | "syncing";
   branchName: string;
   currentShift: string;
+  // La billetera perdió la autorización y no se pudo renovar el token.
+  needsReconnect?: boolean;
 }
 
 export const STATUS_LABELS: Record<PaymentStatus, string> = {

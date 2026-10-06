@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import DashboardClient from "@/components/dashboard-client";
 
-export default async function LiveDashboardPage() {
+export default async function PagosPage() {
   const supabase = await createClient();
 
   const {
@@ -27,6 +27,16 @@ export default async function LiveDashboardPage() {
     redirect("/superadmin");
   }
 
+  const { data: wallet } = await supabase
+    .from("wallets")
+    .select("status")
+    .eq("organization_id", profile.organization_id)
+    .eq("provider", "mercado_pago")
+    .in("status", ["active", "error"])
+    .order("status") // "active" antes que "error"
+    .limit(1)
+    .maybeSingle();
+
   const orgName =
     (profile.organizations as unknown as { name: string } | null)?.name ??
     "Mi comercio";
@@ -38,8 +48,12 @@ export default async function LiveDashboardPage() {
       shift={profile.shift}
       role={profile.role}
       organizationId={profile.organization_id}
+      walletState={
+        !wallet ? "missing" : wallet.status === "error" ? "reconnect" : "ok"
+      }
       endpoint="/api/mercadopago/payments/search"
       enableRealtime={false}
+      pollIntervalMs={30_000}
     />
   );
 }

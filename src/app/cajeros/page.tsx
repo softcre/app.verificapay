@@ -27,7 +27,7 @@ export default async function CajerosPage() {
 
   // El módulo es exclusivo del dueño: un empleado no administra a su equipo.
   if (profile.role !== "owner") {
-    redirect(profile.role === "superadmin" ? "/superadmin" : "/dashboard");
+    redirect(profile.role === "superadmin" ? "/superadmin" : "/pagos");
   }
 
   const { data: employees } = await supabase

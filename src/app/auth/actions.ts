@@ -34,7 +34,7 @@ export async function login(
     .eq("id", signInData.user.id)
     .single();
 
-  redirect(profile?.role === "superadmin" ? "/superadmin" : "/dashboard");
+  redirect(profile?.role === "superadmin" ? "/superadmin" : "/pagos");
 }
 
 export async function signUpOwner(
@@ -87,7 +87,7 @@ export async function signUpOwner(
     return { error: "No se pudo crear tu perfil. Probá de nuevo." };
   }
 
-  redirect("/dashboard");
+  redirect("/pagos");
 }
 
 export async function signUpEmployee(
@@ -142,7 +142,7 @@ export async function signUpEmployee(
     return { error: "No se pudo unir al comercio. Probá de nuevo." };
   }
 
-  redirect("/dashboard");
+  redirect("/pagos");
 }
 
 export async function logout() {
