@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   IconDashboard,
@@ -50,8 +51,15 @@ export default function Sidebar({
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-        <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center font-bold text-white text-lg">
-          V
+        <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center p-1.5 shrink-0">
+          <Image
+            src="/logo-mark.png"
+            alt=""
+            width={256}
+            height={150}
+            className="w-full h-auto"
+            priority
+          />
         </div>
         <div className="flex flex-col">
           <span className="text-white font-semibold text-sm tracking-wide">
