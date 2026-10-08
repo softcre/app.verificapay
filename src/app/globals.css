@@ -22,6 +22,35 @@
   --sidebar-text: #cbd5e1;
   --sidebar-hover: #1e293b;
   --sidebar-active: #0d9488;
+  color-scheme: light;
+}
+
+/* El tema se elige con la clase .dark en <html> (ver lib/theme.ts). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+.dark {
+  --background: #020617;
+  --foreground: #e2e8f0;
+  --card: #0f172a;
+  --card-border: #1e293b;
+  --primary-light: #134e4a;
+  --secondary: #e2e8f0;
+  --success-bg: #052e16;
+  --warning-bg: #451a03;
+  --danger-bg: #450a0a;
+  --muted: #94a3b8;
+  --muted-light: #64748b;
+  --sidebar-bg: #0f172a;
+  --sidebar-hover: #1e293b;
+  color-scheme: dark;
+
+  /* Los textos de badges y alertas usan tonos fijos pensados para fondos
+     claros; en oscuro se aclaran para que contrasten con los *-bg de arriba. */
+  --color-red-200: #7f1d1d;
+  --color-red-700: #fca5a5;
+  --color-green-700: #86efac;
+  --color-green-800: #86efac;
+  --color-amber-700: #fcd34d;
 }
 
 @theme inline {

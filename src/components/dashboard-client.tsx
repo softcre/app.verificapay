@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 interface DashboardClientProps {
   orgName: string;
   userName: string;
+  userEmail: string | null;
   shift: string | null;
   role: UserRole;
   organizationId: string;
@@ -28,6 +29,7 @@ interface DashboardClientProps {
 export default function DashboardClient({
   orgName,
   userName,
+  userEmail,
   shift,
   role,
   organizationId,
@@ -153,12 +155,13 @@ export default function DashboardClient({
 
   return (
     <div className="flex h-full">
-      <Sidebar role={role} userName={userName} />
+      <Sidebar role={role} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <Header
           branchName={orgName}
           currentShift={shiftLabel}
+          user={{ name: userName, email: userEmail, role }}
           connectionStatus={
             hasWallet ? (data?.connectionStatus ?? "syncing") : "disconnected"
           }

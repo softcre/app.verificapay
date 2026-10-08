@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useActionState } from "react";
+import BrandLogo from "@/components/brand-logo";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { login, type AuthActionState } from "@/app/auth/actions";
@@ -24,11 +25,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center font-bold text-white text-2xl mb-3">
-            V
-          </div>
-          <h1 className="text-xl font-bold text-foreground">VerificaPay</h1>
-          <p className="text-sm text-muted mt-1">
+          <h1>
+            <BrandLogo className="w-48 h-auto" />
+          </h1>
+          <p className="text-sm text-muted mt-4">
             Iniciá sesión para verificar pagos
           </p>
         </div>
