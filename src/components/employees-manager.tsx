@@ -254,7 +254,7 @@ function EmployeeRow({
               <button
                 onClick={() => run(() => deleteEmployee(employee.id))}
                 disabled={pending}
-                className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium disabled:opacity-60"
+                className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-600/85 text-white text-xs font-medium disabled:opacity-60"
               >
                 Confirmar
               </button>

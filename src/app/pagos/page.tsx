@@ -15,7 +15,7 @@ export default async function PagosPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, role, shift, organization_id, organizations(name)")
+    .select("full_name, email, role, shift, organization_id, organizations(name)")
     .eq("id", user.id)
     .single();
 
@@ -45,6 +45,7 @@ export default async function PagosPage() {
     <DashboardClient
       orgName={orgName}
       userName={profile.full_name}
+      userEmail={profile.email}
       shift={profile.shift}
       role={profile.role}
       organizationId={profile.organization_id}

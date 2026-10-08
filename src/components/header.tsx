@@ -1,11 +1,13 @@
 "use client";
 
-import { IconRefresh, IconLogout } from "./icons";
-import { logout } from "@/app/auth/actions";
+import { IconRefresh } from "./icons";
+import TopBar from "./top-bar";
+import { type CurrentUser } from "./user-menu";
 
 interface HeaderProps {
   branchName: string;
   currentShift: string;
+  user: CurrentUser;
   connectionStatus: "connected" | "disconnected" | "syncing";
   lastSync: string;
   onRefresh: () => void;
@@ -21,6 +23,7 @@ const CONNECTION_CONFIG = {
 export default function Header({
   branchName,
   currentShift,
+  user,
   connectionStatus,
   lastSync,
   onRefresh,
@@ -34,54 +37,32 @@ export default function Header({
   });
 
   return (
-    <header className="bg-card border-b border-card-border px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-      <div className="flex items-center gap-4 min-w-0 pl-12 lg:pl-0">
-        <div className="min-w-0">
-          <h1 className="text-base font-semibold text-foreground truncate">
-            {branchName}
-          </h1>
-          <p className="text-xs text-muted">{currentShift}</p>
-        </div>
+    <TopBar title={branchName} subtitle={currentShift} user={user}>
+      {/* Connection indicator */}
+      <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-background border border-card-border">
+        <span className={`w-2 h-2 rounded-full ${conn.dotClass}`} />
+        <span className={`text-xs font-medium ${conn.textClass}`}>
+          {conn.label}
+        </span>
+        <span className="text-[11px] text-muted-light ml-1">
+          {syncTime}
+        </span>
       </div>
 
-      <div className="flex items-center gap-3 shrink-0">
-        {/* Connection indicator */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-background border border-card-border">
-          <span className={`w-2 h-2 rounded-full ${conn.dotClass}`} />
-          <span className={`text-xs font-medium ${conn.textClass}`}>
-            {conn.label}
-          </span>
-          <span className="text-[11px] text-muted-light ml-1">
-            {syncTime}
-          </span>
-        </div>
+      {/* Mobile connection dot */}
+      <span className={`sm:hidden w-2.5 h-2.5 rounded-full ${conn.dotClass}`} />
 
-        {/* Mobile connection dot */}
-        <span className={`sm:hidden w-2.5 h-2.5 rounded-full ${conn.dotClass}`} />
-
-        {/* Refresh button */}
-        <button
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-sm font-medium transition-colors disabled:opacity-60"
-        >
-          <IconRefresh
-            className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-          />
-          <span className="hidden sm:inline">Actualizar</span>
-        </button>
-
-        {/* Logout */}
-        <form action={logout}>
-          <button
-            type="submit"
-            title="Cerrar sesión"
-            className="flex items-center justify-center p-2 rounded-lg border border-card-border text-muted hover:text-red-700 hover:border-red-200 hover:bg-danger-bg transition-colors"
-          >
-            <IconLogout className="w-4 h-4" />
-          </button>
-        </form>
-      </div>
-    </header>
+      {/* Refresh button */}
+      <button
+        onClick={onRefresh}
+        disabled={isRefreshing}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-sm font-medium transition-colors disabled:opacity-60"
+      >
+        <IconRefresh
+          className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+        />
+        <span className="hidden sm:inline">Actualizar</span>
+      </button>
+    </TopBar>
   );
 }

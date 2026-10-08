@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Image from "next/image";
+import BrandLogo from "@/components/brand-logo";
 import Link from "next/link";
 import {
   signUpOwner,
@@ -29,14 +29,7 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-6">
-          <Image
-            src="/logo.png"
-            alt="VerificaPay"
-            width={640}
-            height={379}
-            className="w-40 h-auto mb-4"
-            priority
-          />
+          <BrandLogo className="w-40 h-auto mb-4" />
           <h1 className="text-xl font-bold text-foreground">Crear cuenta</h1>
         </div>
 

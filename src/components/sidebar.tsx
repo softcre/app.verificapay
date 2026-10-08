@@ -5,22 +5,18 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   IconDashboard,
-  IconChart,
   IconUsers,
   IconSettings,
-  IconShield,
   IconMenu,
   IconClose,
-  IconLogout,
 } from "./icons";
 import { UserRole } from "@/lib/database.types";
-import { logout } from "@/app/auth/actions";
 
 const NAV_ITEMS = [
   { label: "Pagos", icon: IconDashboard, href: "/pagos", hideForSuperadmin: true },
-  { label: "Reportes", icon: IconChart, href: "#", hideForSuperadmin: true },
+  // { label: "Reportes", icon: IconChart, href: "#", hideForSuperadmin: true },
   { label: "Cajeros", icon: IconUsers, href: "/cajeros", ownerOnly: true },
-  { label: "Seguridad", icon: IconShield, href: "#", hideForSuperadmin: true },
+  // { label: "Seguridad", icon: IconShield, href: "#", hideForSuperadmin: true },
   { label: "Billeteras", icon: IconSettings, href: "/wallets", hideForSuperadmin: true },
   {
     label: "Comercios",
@@ -30,15 +26,7 @@ const NAV_ITEMS = [
   },
 ];
 
-export default function Sidebar({
-  role,
-  userName,
-  userEmail,
-}: {
-  role?: UserRole;
-  userName?: string;
-  userEmail?: string | null;
-}) {
+export default function Sidebar({ role }: { role?: UserRole }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const navItems = NAV_ITEMS.filter((item) => {
@@ -90,48 +78,9 @@ export default function Sidebar({
         })}
       </nav>
 
-      <div className="px-3 pb-4 space-y-2">
-        {(userName || userEmail) && (
-          <div className="px-3 py-3 rounded-lg bg-white/5 border border-white/10 min-w-0">
-            <p className="text-sm text-white font-medium truncate">
-              {userName}
-            </p>
-            {userEmail && (
-              <p className="text-[11px] text-sidebar-text truncate">
-                {userEmail}
-              </p>
-            )}
-          </div>
-        )}
-
-        <div className="px-3 py-3 rounded-lg bg-white/5 border border-white/10">
-          <p className="text-[11px] text-sidebar-text">
-            {role === "owner" || role === "superadmin" ? "Rol" : "Plan Activo"}
-          </p>
-          <p className="text-sm text-white font-medium mt-0.5">
-            {role === "owner"
-              ? "Dueño/a"
-              : role === "employee"
-                ? "Empleado/a"
-                : role === "superadmin"
-                  ? "Superadmin"
-                  : "MVP — Beta"}
-          </p>
-          <div className="mt-2 w-full bg-white/10 rounded-full h-1.5">
-            <div className="bg-primary h-1.5 rounded-full w-1/3" />
-          </div>
-        </div>
-
-        <form action={logout}>
-          <button
-            type="submit"
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-sidebar-text text-sm hover:text-white hover:border-white/20 transition-colors"
-          >
-            <IconLogout className="w-4 h-4" />
-            Cerrar sesión
-          </button>
-        </form>
-      </div>
+      <p className="px-5 py-4 text-[11px] text-sidebar-text/60">
+        VerificaPay · MVP Beta
+      </p>
     </div>
   );
 
