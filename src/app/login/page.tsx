@@ -60,12 +60,20 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-foreground mb-1.5"
-            >
-              Contraseña
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-foreground"
+              >
+                Contraseña
+              </label>
+              <Link
+                href="/recuperar"
+                className="text-xs text-primary font-medium hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
             <input
               id="password"
               name="password"
@@ -76,6 +84,16 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              name="remember"
+              defaultChecked
+              className="size-4 rounded border-card-border accent-primary"
+            />
+            Mantener la sesión iniciada
+          </label>
 
           {state?.error && (
             <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
@@ -91,13 +109,6 @@ export default function LoginPage() {
             {pending ? "Ingresando…" : "Ingresar"}
           </button>
         </form>
-
-        <p className="text-center text-sm text-muted mt-4">
-          ¿No tenés cuenta?{" "}
-          <Link href="/signup" className="text-primary font-medium">
-            Registrate
-          </Link>
-        </p>
       </div>
     </div>
   );

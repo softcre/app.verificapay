@@ -1,10 +1,34 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_ONLY_COOKIE, authCookieOptions } from "./session-cookie";
 
-const PUBLIC_ROUTES = ["/login", "/signup"];
+/** Solo para usuarios sin sesión: con sesión se redirige a /pagos. */
+const PUBLIC_ROUTES = ["/login", "/recuperar"];
+/** Accesibles con o sin sesión (ej. el callback del mail de recuperación). */
+const OPEN_ROUTES = ["/auth/"];
 
 export async function updateSession(request: NextRequest) {
+  // Si Supabase no acepta el redirectTo (no está en "Redirect URLs"), el link
+  // del mail cae en el Site URL con ?code= o ?token_hash=. Lo mandamos al
+  // handler que corresponde en vez de perderlo en el login.
+  const { pathname, searchParams } = request.nextUrl;
+  if (!OPEN_ROUTES.some((route) => pathname.startsWith(route))) {
+    const target = searchParams.has("token_hash")
+      ? "/auth/confirm"
+      : searchParams.has("code")
+        ? "/auth/callback"
+        : null;
+    if (target) {
+      const url = request.nextUrl.clone();
+      url.pathname = target;
+      // Hoy el único mail con link que manda la app es el de recuperación.
+      if (!url.searchParams.has("next")) url.searchParams.set("next", "/restablecer");
+      return NextResponse.redirect(url);
+    }
+  }
+
   let response = NextResponse.next({ request });
+  const sessionOnly = request.cookies.get(SESSION_ONLY_COOKIE)?.value === "1";
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,7 +44,11 @@ export async function updateSession(request: NextRequest) {
           );
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            response.cookies.set(
+              name,
+              value,
+              authCookieOptions(value, options, sessionOnly)
+            )
           );
         },
       },
@@ -33,6 +61,9 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isPublicRoute = PUBLIC_ROUTES.some((route) => path.startsWith(route));
+  const isOpenRoute = OPEN_ROUTES.some((route) => path.startsWith(route));
+
+  if (isOpenRoute) return response;
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();

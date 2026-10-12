@@ -100,8 +100,11 @@ src/
       mercadopago/payments/search/ GET — pagos consultados en vivo a Mercado Pago (los usa /pagos)
       webhooks/mercadopago/ POST — recibe notificaciones de Mercado Pago
       mercadopago/oauth/    GET start/callback — flujo OAuth Authorization Code para vincular la cuenta
-    auth/actions.ts         Server Actions de login/signup/logout
-    login/, signup/         Páginas públicas
+    auth/actions.ts         Server Actions de login/logout y recuperación de contraseña
+    auth/callback/          GET — canjea el código del mail de recuperación por una sesión
+    auth/confirm/           GET — valida el token_hash del mail de recuperación (template en supabase/templates/)
+    login/, recuperar/      Páginas públicas (login y pedido de recuperación)
+    restablecer/            Nueva contraseña (llega desde el link del mail)
     wallets/                Alta/baja de billeteras (solo owner)
     pagos/                  Vista de pagos (pide asociar una billetera si no hay ninguna activa)
     page.tsx                Redirige a /pagos
