@@ -1,10 +1,13 @@
 "use server";
 
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { SESSION_ONLY_COOKIE } from "@/lib/supabase/session-cookie";
 
 export interface AuthActionState {
   error?: string;
+  success?: string;
 }
 
 export async function login(
@@ -13,12 +16,13 @@ export async function login(
 ): Promise<AuthActionState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const remember = formData.get("remember") === "on";
 
   if (!email || !password) {
     return { error: "Completá tu email y contraseña." };
   }
 
-  const supabase = await createClient();
+  const supabase = await createClient({ sessionOnly: !remember });
   const { data: signInData, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -26,6 +30,15 @@ export async function login(
 
   if (error) {
     return { error: "Email o contraseña incorrectos." };
+  }
+
+  // El proxy y el cliente del browser leen esta preferencia al refrescar el
+  // token, para no volver a escribir cookies persistentes.
+  const cookieStore = await cookies();
+  if (remember) {
+    cookieStore.delete(SESSION_ONLY_COOKIE);
+  } else {
+    cookieStore.set(SESSION_ONLY_COOKIE, "1", { path: "/", sameSite: "lax" });
   }
 
   const { data: profile } = await supabase
@@ -37,109 +50,59 @@ export async function login(
   redirect(profile?.role === "superadmin" ? "/superadmin" : "/pagos");
 }
 
-export async function signUpOwner(
+export async function requestPasswordReset(
   _prevState: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
-  const fullName = String(formData.get("fullName") ?? "").trim();
-  const businessName = String(formData.get("businessName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
 
-  if (!fullName || !businessName || !email || !password) {
-    return { error: "Completá todos los campos." };
-  }
-  if (password.length < 8) {
-    return { error: "La contraseña debe tener al menos 8 caracteres." };
+  if (!email) {
+    return { error: "Ingresá tu email." };
   }
 
+  const origin = (await headers()).get("origin");
   const supabase = await createClient();
-
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
-    { email, password }
-  );
-
-  if (signUpError || !signUpData.user) {
-    return {
-      error: signUpError?.message ?? "No se pudo crear la cuenta.",
-    };
-  }
-
-  const { data: org, error: orgError } = await supabase
-    .from("organizations")
-    .insert({ name: businessName })
-    .select("id")
-    .single();
-
-  if (orgError || !org) {
-    return { error: "No se pudo crear el comercio. Probá de nuevo." };
-  }
-
-  const { error: profileError } = await supabase.from("profiles").insert({
-    id: signUpData.user.id,
-    organization_id: org.id,
-    full_name: fullName,
-    email,
-    role: "owner",
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=/restablecer`,
   });
 
-  if (profileError) {
-    return { error: "No se pudo crear tu perfil. Probá de nuevo." };
+  if (error?.status === 429) {
+    return { error: "Hiciste muchos pedidos seguidos. Esperá unos minutos." };
   }
 
-  redirect("/pagos");
+  // Misma respuesta exista o no la cuenta, para no revelar qué emails están
+  // registrados.
+  return {
+    success:
+      "Si el email está registrado, te enviamos un link para restablecer tu contraseña.",
+  };
 }
 
-export async function signUpEmployee(
+export async function resetPassword(
   _prevState: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
-  const fullName = String(formData.get("fullName") ?? "").trim();
-  const inviteCode = String(formData.get("inviteCode") ?? "").trim();
-  const shift = String(formData.get("shift") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
-  if (!fullName || !inviteCode || !email || !password) {
+  if (!newPassword || !confirmPassword) {
     return { error: "Completá todos los campos." };
   }
-  if (password.length < 8) {
+  if (newPassword.length < 8) {
     return { error: "La contraseña debe tener al menos 8 caracteres." };
+  }
+  if (newPassword !== confirmPassword) {
+    return { error: "Las contraseñas no coinciden." };
   }
 
   const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
 
-  const { data: org, error: orgLookupError } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("invite_code", inviteCode)
-    .maybeSingle();
-
-  if (orgLookupError || !org) {
-    return { error: "El código de invitación no es válido." };
+  if (error?.code === "same_password") {
+    return { error: "La nueva contraseña tiene que ser distinta de la actual." };
   }
-
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
-    { email, password }
-  );
-
-  if (signUpError || !signUpData.user) {
-    return {
-      error: signUpError?.message ?? "No se pudo crear la cuenta.",
-    };
-  }
-
-  const { error: profileError } = await supabase.from("profiles").insert({
-    id: signUpData.user.id,
-    organization_id: org.id,
-    full_name: fullName,
-    email,
-    role: "employee",
-    shift: shift || null,
-  });
-
-  if (profileError) {
-    return { error: "No se pudo unir al comercio. Probá de nuevo." };
+  if (error) {
+    return { error: "No se pudo cambiar la contraseña. Probá de nuevo." };
   }
 
   redirect("/pagos");
@@ -148,5 +111,6 @@ export async function signUpEmployee(
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  (await cookies()).delete(SESSION_ONLY_COOKIE);
   redirect("/login");
 }
