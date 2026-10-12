@@ -1,6 +1,7 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/site-url";
 
 /**
  * Destino del link del template de mail personalizado
@@ -23,9 +24,9 @@ export async function GET(request: NextRequest) {
       token_hash: tokenHash,
     });
     if (!error) {
-      return NextResponse.redirect(new URL(safeNext, request.url));
+      return NextResponse.redirect(new URL(safeNext, getSiteUrl()));
     }
   }
 
-  return NextResponse.redirect(new URL("/recuperar?expirado=1", request.url));
+  return NextResponse.redirect(new URL("/recuperar?expirado=1", getSiteUrl()));
 }
