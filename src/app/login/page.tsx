@@ -59,21 +59,15 @@ export default function LoginPage() {
             />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-foreground"
-              >
-                Contraseña
-              </label>
-              <Link
-                href="/recuperar"
-                className="text-xs text-primary font-medium hover:underline"
-              >
-                ¿Olvidaste tu contraseña?
-              </Link>
-            </div>
+          {/* El link va después del input en el DOM para que el Tab pase de
+              email a contraseña; se posiciona arriba a la derecha con CSS. */}
+          <div className="relative">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-foreground mb-1.5"
+            >
+              Contraseña
+            </label>
             <input
               id="password"
               name="password"
@@ -83,6 +77,12 @@ export default function LoginPage() {
               className="w-full px-3 py-2.5 rounded-lg border border-card-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               placeholder="••••••••"
             />
+            <Link
+              href="/recuperar"
+              className="absolute top-0.5 right-0 text-xs text-primary font-medium hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
           </div>
 
           <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer select-none">
@@ -109,6 +109,11 @@ export default function LoginPage() {
             {pending ? "Ingresando…" : "Ingresar"}
           </button>
         </form>
+
+        <p className="text-xs text-muted text-center mt-6">
+          © {new Date().getFullYear()} VerificaPay by Softcre. Todos los
+          derechos reservados.
+        </p>
       </div>
     </div>
   );
