@@ -2,6 +2,7 @@
 
 import { Payment } from "@/lib/types";
 import StatusBadge from "./status-badge";
+import WalletLogo from "./wallet-logo";
 import { IconClock, IconWallet } from "./icons";
 
 function timeAgo(dateStr: string): string {
@@ -17,6 +18,20 @@ function timeAgo(dateStr: string): string {
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
+  });
+}
+
+/** Fecha y hora completa en formato 24 h, para el tooltip de "Tiempo". */
+function fullDateTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
   });
 }
 
@@ -29,7 +44,25 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export default function PaymentList({ payments }: { payments: Payment[] }) {
+const DESKTOP_COLUMNS =
+  "md:grid-cols-[minmax(0,1fr)_130px_120px_170px_130px_100px]";
+
+function NewBadge() {
+  return (
+    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-primary text-white text-[10px] font-semibold uppercase tracking-wide">
+      Nuevo
+    </span>
+  );
+}
+
+export default function PaymentList({
+  payments,
+  highlightIds,
+}: {
+  payments: Payment[];
+  /** Pagos recién llegados: se resaltan unos segundos. */
+  highlightIds?: Set<string>;
+}) {
   if (payments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -49,78 +82,121 @@ export default function PaymentList({ payments }: { payments: Payment[] }) {
   return (
     <div className="space-y-2">
       {/* Desktop table header */}
-      <div className="hidden md:grid md:grid-cols-[1fr_120px_140px_150px_100px] gap-4 px-4 py-2 text-xs font-medium text-muted uppercase tracking-wider">
+      <div
+        className={`hidden md:grid ${DESKTOP_COLUMNS} gap-4 px-4 py-2 text-xs font-medium text-muted uppercase tracking-wider`}
+      >
         <span>Pagador</span>
+        <span>Operación</span>
         <span>Monto</span>
         <span>Método</span>
         <span>Tiempo</span>
         <span>Estado</span>
       </div>
 
-      {payments.map((payment) => (
-        <div
-          key={payment.id}
-          className="bg-card border border-card-border rounded-xl p-4 hover:shadow-md transition-shadow"
-        >
-          {/* Desktop row */}
-          <div className="hidden md:grid md:grid-cols-[1fr_120px_140px_150px_100px] gap-4 items-center">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">
-                {payment.payerName}
-              </p>
-              <p className="text-xs text-muted truncate">
-                {payment.description}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-bold text-foreground">
-                {formatCurrency(payment.amount)}
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <IconWallet className="w-3.5 h-3.5 text-muted-light" />
-              <span className="text-xs text-muted">{payment.wallet}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <IconClock className="w-3.5 h-3.5 text-muted-light" />
-              <span className="text-xs text-muted">
-                {timeAgo(payment.createdAt)}
-              </span>
-            </div>
-            <div>
-              <StatusBadge status={payment.status} />
-            </div>
-          </div>
-
-          {/* Mobile card */}
-          <div className="md:hidden space-y-3">
-            <div className="flex items-start justify-between gap-2">
+      {payments.map((payment) => {
+        const isNew = highlightIds?.has(payment.id) ?? false;
+        return (
+          <div
+            key={payment.id}
+            className={`border rounded-xl p-4 hover:shadow-md transition-[box-shadow,background-color,border-color] duration-700 ${
+              isNew
+                ? "bg-primary-light border-primary ring-2 ring-primary/30"
+                : "bg-card border-card-border"
+            }`}
+          >
+            {/* Desktop row */}
+            <div
+              className={`hidden md:grid ${DESKTOP_COLUMNS} gap-4 items-center`}
+            >
               <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {payment.payerName}
-                </p>
-                <p className="text-xs text-muted mt-0.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {payment.payerName}
+                  </p>
+                  {isNew && <NewBadge />}
+                </div>
+                <p className="text-xs text-muted truncate">
                   {payment.description}
                 </p>
               </div>
-              <StatusBadge status={payment.status} />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-lg font-bold text-foreground">
-                {formatCurrency(payment.amount)}
-              </span>
-              <div className="flex items-center gap-1.5 text-xs text-muted">
-                <IconClock className="w-3.5 h-3.5" />
-                {timeAgo(payment.createdAt)}
+              <div className="min-w-0">
+                <p
+                  className="text-xs font-mono text-foreground truncate"
+                  title={payment.externalId}
+                >
+                  #{payment.externalId}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground">
+                  {formatCurrency(payment.amount)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <WalletLogo provider={payment.walletProvider} />
+                <span
+                  className="text-xs text-muted truncate"
+                  title={payment.walletAlias || payment.wallet}
+                >
+                  {payment.walletAlias || payment.wallet}
+                </span>
+              </div>
+              <div
+                className="flex items-center gap-1.5"
+                title={fullDateTime(payment.createdAt)}
+              >
+                <IconClock className="w-3.5 h-3.5 text-muted-light" />
+                <span className="text-xs text-muted">
+                  {timeAgo(payment.createdAt)}
+                </span>
+              </div>
+              <div>
+                <StatusBadge status={payment.status} />
               </div>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted border-t border-card-border pt-2">
-              <IconWallet className="w-3.5 h-3.5" />
-              {payment.wallet} · {payment.paymentMethod}
+  
+            {/* Mobile card */}
+            <div className="md:hidden space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {payment.payerName}
+                    </p>
+                    {isNew && <NewBadge />}
+                  </div>
+                  <p className="text-xs text-muted mt-0.5">
+                    {payment.description}
+                  </p>
+                  <p className="text-xs font-mono text-muted mt-0.5">
+                    Op. #{payment.externalId}
+                  </p>
+                </div>
+                <StatusBadge status={payment.status} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-bold text-foreground">
+                  {formatCurrency(payment.amount)}
+                </span>
+                <div
+                  className="flex items-center gap-1.5 text-xs text-muted"
+                  title={fullDateTime(payment.createdAt)}
+                >
+                  <IconClock className="w-3.5 h-3.5" />
+                  {timeAgo(payment.createdAt)}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted border-t border-card-border pt-2 min-w-0">
+                <WalletLogo provider={payment.walletProvider} />
+                <span className="truncate">
+                  {payment.walletAlias || payment.wallet}
+                  {payment.paymentMethod && ` · ${payment.paymentMethod}`}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

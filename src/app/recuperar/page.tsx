@@ -15,7 +15,7 @@ const initialState: AuthActionState = {};
 function ExpiredNotice() {
   if (useSearchParams().get("expirado") !== "1") return null;
   return (
-    <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2 mb-4">
+    <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2 mb-4">
       El link expiró o ya fue usado. Pedí uno nuevo.
     </p>
   );
@@ -67,12 +67,12 @@ export default function RecoverPasswordPage() {
           </div>
 
           {state?.error && (
-            <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+            <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
               {state.error}
             </p>
           )}
           {state?.success && (
-            <p className="text-sm text-green-800 bg-success-bg rounded-lg px-3 py-2">
+            <p className="text-sm text-success-fg bg-success-bg rounded-lg px-3 py-2">
               {state.success}
             </p>
           )}

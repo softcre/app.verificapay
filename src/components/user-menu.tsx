@@ -139,7 +139,7 @@ export default function UserMenu({ user }: { user: CurrentUser }) {
             <button
               type="submit"
               role="menuitem"
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-red-700 hover:bg-danger-bg"
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-danger-fg hover:bg-danger-bg"
             >
               <IconLogout className="w-4 h-4" />
               Cerrar sesión

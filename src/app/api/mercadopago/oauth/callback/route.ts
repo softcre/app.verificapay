@@ -1,6 +1,9 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { exchangeMercadoPagoOAuthCode } from "@/lib/mercadopago";
+import {
+  exchangeMercadoPagoOAuthCode,
+  getMercadoPagoUser,
+} from "@/lib/mercadopago";
 import { saveWalletCredentials } from "@/lib/mercadopago-wallet";
 import {
   getMercadoPagoRedirectUri,
@@ -12,6 +15,17 @@ export const dynamic = "force-dynamic";
 
 function redirectToWallets(query: string) {
   return Response.redirect(`${getSiteUrl()}/wallets${query}`);
+}
+
+/** Con varias cuentas de MP, el apodo de la cuenta las distingue de entrada. */
+async function defaultMercadoPagoAlias(accessToken: string): Promise<string> {
+  try {
+    const { nickname, email } = await getMercadoPagoUser(accessToken);
+    const account = nickname ?? email;
+    return account ? `Mercado Pago · ${account}` : "Mercado Pago";
+  } catch {
+    return "Mercado Pago";
+  }
 }
 
 export async function GET(req: Request) {
@@ -72,7 +86,6 @@ export async function GET(req: Request) {
   const walletData = {
     organization_id: profile.organization_id,
     provider: "mercado_pago" as const,
-    alias: "Mercado Pago",
     public_key: tokens.public_key ?? null,
     collector_id: collectorId,
     status: "active" as const,
@@ -80,7 +93,8 @@ export async function GET(req: Request) {
   };
 
   // La escritura en `wallets` pasa por RLS (solo el owner); recién con eso
-  // confirmado se guardan los tokens con la service key.
+  // confirmado se guardan los tokens con la service key. Al reconectar una
+  // cuenta se conserva el nombre que le haya puesto el dueño.
   const { data: wallet, error } = existing
     ? await supabase
         .from("wallets")
@@ -88,7 +102,14 @@ export async function GET(req: Request) {
         .eq("id", existing.id)
         .select("id")
         .single()
-    : await supabase.from("wallets").insert(walletData).select("id").single();
+    : await supabase
+        .from("wallets")
+        .insert({
+          ...walletData,
+          alias: await defaultMercadoPagoAlias(tokens.access_token),
+        })
+        .select("id")
+        .single();
 
   if (error || !wallet) {
     return redirectToWallets("?mp_error=guardado_fallido");

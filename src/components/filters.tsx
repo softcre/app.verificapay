@@ -62,7 +62,7 @@ export default function Filters({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Buscar por nombre o monto…"
+          placeholder="Buscar por nombre, monto u operación…"
           className="w-full pl-9 pr-4 py-2 rounded-lg border border-card-border bg-card text-sm text-foreground placeholder:text-muted-light focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
         />
       </div>

@@ -10,14 +10,16 @@ interface HeaderProps {
   user: CurrentUser;
   connectionStatus: "connected" | "disconnected" | "syncing";
   lastSync: string;
+  // Sin billetera no hay nada que sincronizar: se ocultan estado y botón.
+  hasWallet: boolean;
   onRefresh: () => void;
   isRefreshing: boolean;
 }
 
 const CONNECTION_CONFIG = {
-  connected: { label: "Conectado", dotClass: "bg-success", textClass: "text-green-700" },
-  disconnected: { label: "Desconectado", dotClass: "bg-danger", textClass: "text-red-700" },
-  syncing: { label: "Sincronizando…", dotClass: "bg-warning animate-pulse", textClass: "text-amber-700" },
+  connected: { label: "Conectado", dotClass: "bg-success", textClass: "text-success-fg" },
+  disconnected: { label: "Desconectado", dotClass: "bg-danger", textClass: "text-danger-fg" },
+  syncing: { label: "Sincronizando…", dotClass: "bg-warning animate-pulse", textClass: "text-warning-fg" },
 };
 
 export default function Header({
@@ -26,9 +28,14 @@ export default function Header({
   user,
   connectionStatus,
   lastSync,
+  hasWallet,
   onRefresh,
   isRefreshing,
 }: HeaderProps) {
+  if (!hasWallet) {
+    return <TopBar title={branchName} subtitle={currentShift} user={user} />;
+  }
+
   const conn = CONNECTION_CONFIG[connectionStatus];
   const syncTime = new Date(lastSync).toLocaleTimeString("es-AR", {
     hour: "2-digit",

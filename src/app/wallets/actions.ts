@@ -90,6 +90,30 @@ export async function toggleWalletStatus(walletId: string, isActive: boolean) {
   revalidatePath("/wallets");
 }
 
+// RLS limita la escritura al owner del comercio de la billetera.
+export async function renameWallet(
+  walletId: string,
+  alias: string
+): Promise<WalletActionState> {
+  const trimmed = alias.trim();
+  if (!trimmed) return { error: "El nombre no puede quedar vacío." };
+  if (trimmed.length > 60) return { error: "Usá un nombre más corto." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("wallets")
+    .update({ alias: trimmed })
+    .eq("id", walletId)
+    .select("id");
+
+  if (error || !data?.length) {
+    return { error: "No se pudo cambiar el nombre." };
+  }
+
+  revalidatePath("/wallets");
+  return {};
+}
+
 export async function deleteWallet(walletId: string) {
   const supabase = await createClient();
   await supabase.from("wallets").delete().eq("id", walletId);

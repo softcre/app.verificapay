@@ -5,7 +5,7 @@ export default function BrandLogo({ className }: { className?: string }) {
   return (
     <>
       <Image
-        src="/logo.png"
+        src="/brand/logo.png"
         alt="VerificaPay"
         width={640}
         height={379}
@@ -13,7 +13,7 @@ export default function BrandLogo({ className }: { className?: string }) {
         className={`${className} dark:hidden`}
       />
       <Image
-        src="/logo-dark.png"
+        src="/brand/logo-dark.png"
         alt="VerificaPay"
         width={640}
         height={379}
