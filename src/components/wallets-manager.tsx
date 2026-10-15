@@ -53,12 +53,12 @@ export default function WalletsManager({
   return (
     <div className="max-w-3xl space-y-6">
       {mpNotice?.connected && (
-        <p className="text-sm text-green-800 bg-success-bg rounded-lg px-3 py-2">
+        <p className="text-sm text-success-fg bg-success-bg rounded-lg px-3 py-2">
           Tu cuenta de Mercado Pago se conectó correctamente.
         </p>
       )}
       {mpNotice?.error && (
-        <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+        <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
           {MP_ERROR_MESSAGES[mpNotice.error] ??
             "No se pudo conectar con Mercado Pago."}
         </p>
@@ -183,7 +183,7 @@ export default function WalletsManager({
             </div>
 
             {state?.error && (
-              <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+              <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
                 {state.error}
               </p>
             )}
@@ -234,7 +234,7 @@ function WalletRow({
         <span
           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
             status === "active"
-              ? "bg-success-bg text-green-800"
+              ? "bg-success-bg text-success-fg"
               : "bg-card-border text-muted"
           }`}
         >
@@ -260,7 +260,7 @@ function WalletRow({
                 deleteWallet(wallet.id);
               }}
               title="Eliminar"
-              className="p-1.5 rounded-lg border border-card-border text-muted hover:text-red-700 hover:border-red-200"
+              className="p-1.5 rounded-lg border border-card-border text-muted hover:text-danger-fg hover:border-danger/40"
             >
               <IconClose className="w-4 h-4" />
             </button>

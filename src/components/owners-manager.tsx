@@ -55,12 +55,12 @@ export default function OwnersManager({ owners }: { owners: OwnerWithOrg[] }) {
       {showForm && <CreateOwnerForm />}
 
       {rowFeedback.error && (
-        <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+        <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
           {rowFeedback.error}
         </p>
       )}
       {rowFeedback.success && (
-        <p className="text-sm text-green-800 bg-success-bg rounded-lg px-3 py-2">
+        <p className="text-sm text-success-fg bg-success-bg rounded-lg px-3 py-2">
           {rowFeedback.success}
         </p>
       )}
@@ -143,12 +143,12 @@ function CreateOwnerForm() {
         </div>
 
         {state.error && (
-          <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+          <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
             {state.error}
           </p>
         )}
         {state.success && (
-          <p className="text-sm text-green-800 bg-success-bg rounded-lg px-3 py-2">
+          <p className="text-sm text-success-fg bg-success-bg rounded-lg px-3 py-2">
             {state.success}
           </p>
         )}
@@ -207,7 +207,7 @@ function OwnerRow({
           <span
             className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
               isActive
-                ? "bg-success-bg text-green-800"
+                ? "bg-success-bg text-success-fg"
                 : "bg-card-border text-muted"
             }`}
           >
@@ -257,7 +257,7 @@ function OwnerRow({
               onClick={() => setConfirmingDelete(true)}
               disabled={pending}
               title="Eliminar dueño y su comercio"
-              className="p-1.5 rounded-lg border border-card-border text-muted hover:text-red-700 hover:border-red-200 disabled:opacity-60"
+              className="p-1.5 rounded-lg border border-card-border text-muted hover:text-danger-fg hover:border-danger/40 disabled:opacity-60"
             >
               <IconClose className="w-4 h-4" />
             </button>
@@ -266,7 +266,7 @@ function OwnerRow({
       </div>
 
       {confirmingDelete && (
-        <p className="mt-3 text-xs text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+        <p className="mt-3 text-xs text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
           Se eliminará el comercio completo: cajeros, billeteras y pagos
           asociados. Esta acción no se puede deshacer.
         </p>
@@ -329,7 +329,7 @@ function EditOwnerForm({
       </div>
 
       {state.error && (
-        <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+        <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
           {state.error}
         </p>
       )}

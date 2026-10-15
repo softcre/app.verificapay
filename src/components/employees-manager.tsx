@@ -57,12 +57,12 @@ export default function EmployeesManager({
       {showForm && <CreateEmployeeForm />}
 
       {rowFeedback.error && (
-        <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+        <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
           {rowFeedback.error}
         </p>
       )}
       {rowFeedback.success && (
-        <p className="text-sm text-green-800 bg-success-bg rounded-lg px-3 py-2">
+        <p className="text-sm text-success-fg bg-success-bg rounded-lg px-3 py-2">
           {rowFeedback.success}
         </p>
       )}
@@ -157,12 +157,12 @@ function CreateEmployeeForm() {
         </div>
 
         {state.error && (
-          <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+          <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
             {state.error}
           </p>
         )}
         {state.success && (
-          <p className="text-sm text-green-800 bg-success-bg rounded-lg px-3 py-2">
+          <p className="text-sm text-success-fg bg-success-bg rounded-lg px-3 py-2">
             {state.success}
           </p>
         )}
@@ -221,7 +221,7 @@ function EmployeeRow({
           <span
             className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
               isActive
-                ? "bg-success-bg text-green-800"
+                ? "bg-success-bg text-success-fg"
                 : "bg-card-border text-muted"
             }`}
           >
@@ -271,7 +271,7 @@ function EmployeeRow({
               onClick={() => setConfirmingDelete(true)}
               disabled={pending}
               title="Eliminar cajero"
-              className="p-1.5 rounded-lg border border-card-border text-muted hover:text-red-700 hover:border-red-200 disabled:opacity-60"
+              className="p-1.5 rounded-lg border border-card-border text-muted hover:text-danger-fg hover:border-danger/40 disabled:opacity-60"
             >
               <IconClose className="w-4 h-4" />
             </button>
@@ -338,7 +338,7 @@ function EditEmployeeForm({
       </div>
 
       {state.error && (
-        <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+        <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
           {state.error}
         </p>
       )}

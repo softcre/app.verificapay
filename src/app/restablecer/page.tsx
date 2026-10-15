@@ -69,7 +69,7 @@ export default function ResetPasswordPage() {
           </div>
 
           {state?.error && (
-            <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+            <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
               {state.error}
             </p>
           )}

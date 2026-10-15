@@ -41,19 +41,21 @@ export const STATUS_COLORS: Record<
   PaymentStatus,
   { bg: string; text: string; dot: string }
 > = {
+  // Los colores se adaptan solos al tema (ver globals.css); el borde solo
+  // en oscuro, donde el fondo translúcido necesita un poco más de contorno.
   approved: {
-    bg: "bg-success-bg",
-    text: "text-green-800",
+    bg: "bg-success-bg dark:ring-1 dark:ring-inset dark:ring-success/30",
+    text: "text-success-fg",
     dot: "bg-success",
   },
   pending: {
-    bg: "bg-warning-bg",
-    text: "text-amber-800",
+    bg: "bg-warning-bg dark:ring-1 dark:ring-inset dark:ring-warning/30",
+    text: "text-warning-fg",
     dot: "bg-warning",
   },
   rejected: {
-    bg: "bg-danger-bg",
-    text: "text-red-800",
+    bg: "bg-danger-bg dark:ring-1 dark:ring-inset dark:ring-danger/30",
+    text: "text-danger-fg",
     dot: "bg-danger",
   },
 };

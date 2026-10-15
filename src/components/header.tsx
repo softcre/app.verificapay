@@ -15,9 +15,9 @@ interface HeaderProps {
 }
 
 const CONNECTION_CONFIG = {
-  connected: { label: "Conectado", dotClass: "bg-success", textClass: "text-green-700" },
-  disconnected: { label: "Desconectado", dotClass: "bg-danger", textClass: "text-red-700" },
-  syncing: { label: "Sincronizando…", dotClass: "bg-warning animate-pulse", textClass: "text-amber-700" },
+  connected: { label: "Conectado", dotClass: "bg-success", textClass: "text-success-fg" },
+  disconnected: { label: "Desconectado", dotClass: "bg-danger", textClass: "text-danger-fg" },
+  syncing: { label: "Sincronizando…", dotClass: "bg-warning animate-pulse", textClass: "text-warning-fg" },
 };
 
 export default function Header({

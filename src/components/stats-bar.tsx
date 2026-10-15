@@ -29,7 +29,7 @@ export default function StatsBar({ payments }: { payments: Payment[] }) {
     {
       label: "Acreditados",
       value: String(approved.length),
-      accent: "text-green-700",
+      accent: "text-success-fg",
       bg: "bg-success-bg",
       icon: null,
       iconComponent: <IconCheck className="w-4 h-4 text-success" />,
@@ -37,14 +37,14 @@ export default function StatsBar({ payments }: { payments: Payment[] }) {
     {
       label: "Pendientes",
       value: String(pending.length),
-      accent: "text-amber-700",
+      accent: "text-warning-fg",
       bg: "bg-warning-bg",
       icon: "⏳",
     },
     {
       label: "Rechazados",
       value: String(rejected.length),
-      accent: "text-red-700",
+      accent: "text-danger-fg",
       bg: "bg-danger-bg",
       icon: "✕",
     },

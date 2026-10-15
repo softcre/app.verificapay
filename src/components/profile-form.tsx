@@ -185,14 +185,14 @@ function ReadOnly({ label, value }: { label: string; value: string }) {
 function Feedback({ state }: { state: ProfileActionState }) {
   if (state.error) {
     return (
-      <p className="text-sm text-red-700 bg-danger-bg rounded-lg px-3 py-2">
+      <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
         {state.error}
       </p>
     );
   }
   if (state.success) {
     return (
-      <p className="text-sm text-green-800 bg-success-bg rounded-lg px-3 py-2">
+      <p className="text-sm text-success-fg bg-success-bg rounded-lg px-3 py-2">
         {state.success}
       </p>
     );
