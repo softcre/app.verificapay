@@ -39,6 +39,8 @@ export interface Wallet {
   connected_by: string | null;
   created_at: string;
   updated_at: string;
+  last_synced_at?: string | null;
+  sync_started_at?: string | null;
 }
 
 export interface DbPayment {

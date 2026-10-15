@@ -17,9 +17,10 @@ const WALLET_BADGES: Record<WalletProvider, { initials: string; className: strin
 
 export default function WalletLogo({
   provider,
-  className = "",
+  className = "w-6 h-6",
 }: {
   provider: WalletProvider;
+  /** Tamaño del logo (por defecto w-6 h-6). */
   className?: string;
 }) {
   const label = WALLET_PROVIDER_LABELS[provider] ?? provider;
@@ -31,9 +32,9 @@ export default function WalletLogo({
         src={logo}
         alt={label}
         title={label}
-        width={24}
-        height={24}
-        className={`shrink-0 w-6 h-6 object-contain ${className}`}
+        width={36}
+        height={36}
+        className={`shrink-0 object-contain ${className}`}
       />
     );
   }
@@ -47,7 +48,7 @@ export default function WalletLogo({
     <span
       title={label}
       aria-label={label}
-      className={`inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-md text-[9px] font-bold leading-none ${badge.className} ${className}`}
+      className={`inline-flex items-center justify-center shrink-0 rounded-md text-[9px] font-bold leading-none ${badge.className} ${className}`}
     >
       {badge.initials}
     </span>

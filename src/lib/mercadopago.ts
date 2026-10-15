@@ -188,15 +188,34 @@ export async function fetchMercadoPagoPaymentById(
   return res.json();
 }
 
+type MpDateField = "date_created" | "date_last_updated";
+
+interface MpSearchParams {
+  collectorId?: string;
+  limit?: number;
+  offset?: number;
+  // Rango de fechas (formato de MP) sobre `rangeField`.
+  beginDate?: string;
+  endDate?: string;
+  rangeField?: MpDateField;
+  sort?: MpDateField;
+  criteria?: "asc" | "desc";
+}
+
 export async function searchMercadoPagoPayments(
   accessToken: string,
-  params: { collectorId?: string; limit?: number; offset?: number } = {}
+  params: MpSearchParams = {}
 ): Promise<MpPayment[]> {
   const url = new URL("https://api.mercadopago.com/v1/payments/search");
-  url.searchParams.set("sort", "date_created");
-  url.searchParams.set("criteria", "desc");
+  url.searchParams.set("sort", params.sort ?? "date_created");
+  url.searchParams.set("criteria", params.criteria ?? "desc");
   if (params.collectorId) {
     url.searchParams.set("collector.id", params.collectorId);
+  }
+  if (params.beginDate) {
+    url.searchParams.set("range", params.rangeField ?? "date_created");
+    url.searchParams.set("begin_date", params.beginDate);
+    url.searchParams.set("end_date", params.endDate ?? "NOW");
   }
   url.searchParams.set("limit", String(params.limit ?? 50));
   url.searchParams.set("offset", String(params.offset ?? 0));
@@ -217,9 +236,39 @@ export async function searchMercadoPagoPayments(
   return json.results;
 }
 
-export async function getMercadoPagoCollectorId(
+/**
+ * Trae todas las páginas de un rango de fechas, hasta `maxResults` para no
+ * disparar decenas de pedidos en períodos con mucho movimiento.
+ */
+export async function searchAllMercadoPagoPayments(
+  accessToken: string,
+  params: Omit<MpSearchParams, "limit" | "offset"> & {
+    beginDate: string;
+    maxResults?: number;
+  }
+): Promise<{ payments: MpPayment[]; truncated: boolean }> {
+  const pageSize = 50;
+  const maxResults = params.maxResults ?? 500;
+  const payments: MpPayment[] = [];
+
+  while (payments.length < maxResults) {
+    const page = await searchMercadoPagoPayments(accessToken, {
+      ...params,
+      limit: pageSize,
+      offset: payments.length,
+    });
+    payments.push(...page);
+    if (page.length < pageSize) {
+      return { payments, truncated: false };
+    }
+  }
+
+  return { payments, truncated: true };
+}
+
+export async function getMercadoPagoUser(
   accessToken: string
-): Promise<string> {
+): Promise<{ id: string; nickname: string | null; email: string | null }> {
   const res = await fetch("https://api.mercadopago.com/users/me", {
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
@@ -229,8 +278,19 @@ export async function getMercadoPagoCollectorId(
     throw new Error(`Mercado Pago respondió ${res.status} al pedir el usuario`);
   }
 
-  const json: { id: number } = await res.json();
-  return String(json.id);
+  const json: { id: number; nickname?: string | null; email?: string | null } =
+    await res.json();
+  return {
+    id: String(json.id),
+    nickname: json.nickname ?? null,
+    email: json.email ?? null,
+  };
+}
+
+export async function getMercadoPagoCollectorId(
+  accessToken: string
+): Promise<string> {
+  return (await getMercadoPagoUser(accessToken)).id;
 }
 
 export interface MpOAuthTokens {

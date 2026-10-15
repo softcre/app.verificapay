@@ -15,9 +15,16 @@ export interface Payment {
   updatedAt: string;
   paymentMethod: string;
   wallet: string;
+  walletId: string;
   walletProvider: WalletProvider;
   // Nombre que el dueño le puso a la billetera (wallets.alias).
   walletAlias: string;
+}
+
+export interface WalletSummary {
+  id: string;
+  alias: string;
+  provider: WalletProvider;
 }
 
 export interface PaymentsResponse {
@@ -27,8 +34,13 @@ export interface PaymentsResponse {
   connectionStatus: "connected" | "disconnected" | "syncing";
   branchName: string;
   currentShift: string;
-  // La billetera perdió la autorización y no se pudo renovar el token.
+  // Ninguna billetera tiene autorización vigente: hay que volver a conectarlas.
   needsReconnect?: boolean;
+  // Billeteras del comercio (para el filtro) y las que hay que reconectar.
+  wallets?: WalletSummary[];
+  reconnectWallets?: string[];
+  // El período tenía más pagos que el máximo que se trae por consulta.
+  truncated?: boolean;
 }
 
 export const STATUS_LABELS: Record<PaymentStatus, string> = {

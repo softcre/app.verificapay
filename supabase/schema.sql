@@ -101,6 +101,13 @@ begin
   end if;
 end $$;
 
+-- Sincronización de pagos contra la API del proveedor (ver lib/payment-sync.ts):
+--   last_synced_at: hasta dónde están guardados los cambios (cursor incremental).
+--   sync_started_at: turno de la última sincronización; evita que varias
+--                    pantallas abiertas consulten la misma billetera a la vez.
+alter table public.wallets add column if not exists last_synced_at timestamptz;
+alter table public.wallets add column if not exists sync_started_at timestamptz;
+
 create index if not exists wallets_organization_id_idx on public.wallets(organization_id);
 create unique index if not exists wallets_collector_id_idx on public.wallets(provider, collector_id) where collector_id is not null;
 
@@ -123,7 +130,8 @@ create trigger wallet_credentials_set_updated_at
   for each row execute function public.set_updated_at();
 
 -- ============================================================
--- PAYMENTS (pagos recibidos, alimentados por el webhook del proveedor)
+-- PAYMENTS (pagos recibidos: los escriben la sincronización contra la API
+-- del proveedor y, para Mercado Pago, también el webhook)
 -- ============================================================
 create table if not exists public.payments (
   id uuid primary key default gen_random_uuid(),
@@ -147,6 +155,7 @@ create table if not exists public.payments (
 );
 
 create index if not exists payments_organization_id_idx on public.payments(organization_id, provider_created_at desc);
+create index if not exists payments_wallet_id_idx on public.payments(wallet_id, provider_created_at desc);
 
 -- Habilita Supabase Realtime sobre payments para que el dashboard se
 -- actualice solo cuando el webhook inserta un pago nuevo.

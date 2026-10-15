@@ -52,8 +52,10 @@ export default async function PagosPage() {
       walletState={
         !wallet ? "missing" : wallet.status === "error" ? "reconnect" : "ok"
       }
-      endpoint="/api/mercadopago/payments/search"
-      enableRealtime={false}
+      endpoint="/api/payments"
+      // Realtime avisa al instante de los pagos nuevos (webhook o
+      // sincronización); la consulta periódica trae los cambios de estado.
+      enableRealtime
       pollIntervalMs={30_000}
     />
   );

@@ -10,10 +10,12 @@ import {
 import {
   addWallet,
   deleteWallet,
+  renameWallet,
   toggleWalletStatus,
   WalletActionState,
 } from "@/app/wallets/actions";
-import { IconWallet, IconCheck, IconClose } from "./icons";
+import { IconWallet, IconCheck, IconClose, IconPencil } from "./icons";
+import WalletLogo from "./wallet-logo";
 
 const PROVIDERS: WalletProvider[] = [
   "mercado_pago",
@@ -114,6 +116,11 @@ export default function WalletsManager({
             Vinculá tu cuenta de Mercado Pago para que VerificaPay lea tus
             pagos automáticamente, sin tener que copiar ningún token.
           </p>
+          <p className="text-xs text-muted mb-3">
+            ¿Tenés más de una cuenta? Conectalas de a una. Antes de sumar otra,
+            cerrá sesión en mercadopago.com.ar para que te pida la nueva
+            cuenta; si no, se vuelve a conectar la misma.
+          </p>
           <a
             href="/api/mercadopago/oauth/start"
             className="inline-flex items-center px-4 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-sm font-medium transition-colors"
@@ -211,22 +218,103 @@ function WalletRow({
 }) {
   const [status, setStatus] = useState(wallet.status);
   const [removed, setRemoved] = useState(false);
+  const [alias, setAlias] = useState(wallet.alias);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(wallet.alias);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   if (removed) return null;
 
+  async function saveAlias() {
+    if (draft.trim() === alias) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    const result = await renameWallet(wallet.id, draft);
+    setSaving(false);
+    if (result.error) {
+      setRenameError(result.error);
+      return;
+    }
+    setAlias(draft.trim());
+    setRenameError(null);
+    setEditing(false);
+  }
+
   return (
     <div className="bg-card border border-card-border rounded-xl p-4 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-9 h-9 rounded-lg bg-primary-light flex items-center justify-center shrink-0">
-          <IconWallet className="w-4 h-4 text-primary" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">
-            {wallet.alias}
-          </p>
-          <p className="text-xs text-muted">
-            {WALLET_PROVIDER_LABELS[wallet.provider]}
-          </p>
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <WalletLogo provider={wallet.provider} className="w-9 h-9" />
+        <div className="min-w-0 flex-1">
+          {editing ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveAlias();
+              }}
+              className="flex items-center gap-1.5"
+            >
+              <input
+                autoFocus
+                value={draft}
+                maxLength={60}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setDraft(alias);
+                    setRenameError(null);
+                    setEditing(false);
+                  }
+                }}
+                aria-label="Nombre de la billetera"
+                className="w-full max-w-xs px-2 py-1 rounded-md border border-card-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              />
+              <button
+                type="submit"
+                disabled={saving}
+                title="Guardar"
+                className="p-1.5 rounded-lg border border-card-border text-muted hover:text-foreground disabled:opacity-60"
+              >
+                <IconCheck className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                title="Cancelar"
+                onClick={() => {
+                  setDraft(alias);
+                  setRenameError(null);
+                  setEditing(false);
+                }}
+                className="p-1.5 rounded-lg border border-card-border text-muted hover:text-foreground"
+              >
+                <IconClose className="w-4 h-4" />
+              </button>
+            </form>
+          ) : (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">
+                {alias}
+              </p>
+              {isOwner && (
+                <button
+                  onClick={() => setEditing(true)}
+                  title="Cambiar nombre"
+                  className="p-1 rounded text-muted-light hover:text-foreground shrink-0"
+                >
+                  <IconPencil className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+          {renameError ? (
+            <p className="text-xs text-danger-fg mt-1">{renameError}</p>
+          ) : (
+            <p className="text-xs text-muted">
+              {WALLET_PROVIDER_LABELS[wallet.provider]}
+            </p>
+          )}
         </div>
       </div>
 

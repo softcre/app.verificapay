@@ -1,10 +1,10 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   fetchMercadoPagoPaymentById,
-  normalizeMpPayment,
   verifyMercadoPagoSignature,
 } from "@/lib/mercadopago";
 import { withMercadoPagoToken } from "@/lib/mercadopago-wallet";
+import { toPaymentRow } from "@/lib/payment-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -55,31 +55,15 @@ export async function POST(req: Request) {
     const mpPayment = await withMercadoPagoToken(wallet.id, (accessToken) =>
       fetchMercadoPagoPaymentById(accessToken, dataId)
     );
-    const normalized = normalizeMpPayment(mpPayment);
+    const { isIncoming, ...row } = toPaymentRow(wallet, mpPayment);
 
-    if (!normalized.isIncoming) {
+    if (!isIncoming) {
       return Response.json({ received: true });
     }
 
-    await supabase.from("payments").upsert(
-      {
-        organization_id: wallet.organization_id,
-        wallet_id: wallet.id,
-        provider: "mercado_pago",
-        provider_payment_id: normalized.providerId,
-        amount: normalized.amount,
-        currency: normalized.currency,
-        status: normalized.status,
-        payer_name: normalized.payerName,
-        payer_email: normalized.payerEmail,
-        description: normalized.description,
-        payment_method: normalized.paymentMethod,
-        raw: mpPayment,
-        provider_created_at: normalized.createdAt,
-        provider_updated_at: normalized.updatedAt,
-      },
-      { onConflict: "provider,provider_payment_id" }
-    );
+    await supabase
+      .from("payments")
+      .upsert(row, { onConflict: "provider,provider_payment_id" });
   } catch (err) {
     console.error("Error procesando webhook de Mercado Pago:", err);
     return Response.json({ received: true });
