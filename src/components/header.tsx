@@ -10,6 +10,8 @@ interface HeaderProps {
   user: CurrentUser;
   connectionStatus: "connected" | "disconnected" | "syncing";
   lastSync: string;
+  // Sin billetera no hay nada que sincronizar: se ocultan estado y botón.
+  hasWallet: boolean;
   onRefresh: () => void;
   isRefreshing: boolean;
 }
@@ -26,9 +28,14 @@ export default function Header({
   user,
   connectionStatus,
   lastSync,
+  hasWallet,
   onRefresh,
   isRefreshing,
 }: HeaderProps) {
+  if (!hasWallet) {
+    return <TopBar title={branchName} subtitle={currentShift} user={user} />;
+  }
+
   const conn = CONNECTION_CONFIG[connectionStatus];
   const syncTime = new Date(lastSync).toLocaleTimeString("es-AR", {
     hour: "2-digit",

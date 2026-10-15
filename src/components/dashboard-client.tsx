@@ -167,6 +167,7 @@ export default function DashboardClient({
             hasWallet ? (data?.connectionStatus ?? "syncing") : "disconnected"
           }
           lastSync={data?.lastSync ?? "2000-01-01T00:00:00Z"}
+          hasWallet={hasWallet}
           onRefresh={fetchPayments}
           isRefreshing={isRefreshing}
         />
@@ -176,10 +177,12 @@ export default function DashboardClient({
             <h2 className="text-xl font-bold text-foreground">
               Estado de Pagos
             </h2>
-            <p className="text-sm text-muted mt-0.5">
-              Verificá los pagos recibidos. Se actualiza sola cada 30
-              segundos, o manualmente con el botón Actualizar.
-            </p>
+            {hasWallet && (
+              <p className="text-sm text-muted mt-0.5">
+                Verificá los pagos recibidos. Se actualiza sola cada 30
+                segundos, o manualmente con el botón Actualizar.
+              </p>
+            )}
           </div>
 
           {hasWallet ? (
