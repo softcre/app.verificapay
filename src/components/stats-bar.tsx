@@ -1,7 +1,13 @@
 "use client";
 
-import { Payment, STATUS_LABELS } from "@/lib/types";
-import { IconCheck, IconClock, IconWallet } from "./icons";
+import { Payment } from "@/lib/types";
+import StatusBadge from "./status-badge";
+import {
+  IconBanknotes,
+  IconBolt,
+  IconCheckBadge,
+  IconInboxArrowDown,
+} from "./icons";
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("es-AR", {
@@ -22,6 +28,77 @@ function formatTime(dateStr: string): string {
   });
 }
 
+function plural(n: number, singular: string, pluralForm: string) {
+  return `${n} ${n === 1 ? singular : pluralForm}`;
+}
+
+function StatCard({
+  label,
+  icon,
+  iconClass,
+  value,
+  valueClass = "text-foreground",
+  footer,
+  featured = false,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  iconClass: string;
+  value: React.ReactNode;
+  valueClass?: string;
+  footer?: React.ReactNode;
+  /** Tarjeta destacada: fondo con el color principal. */
+  featured?: boolean;
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden rounded-2xl p-4 sm:p-5 flex flex-col gap-3 min-w-0 ${
+        featured
+          ? "bg-linear-to-br from-primary to-primary-dark text-white shadow-lg shadow-primary/20"
+          : "bg-card border border-card-border shadow-sm"
+      }`}
+    >
+      {featured && (
+        // Brillo decorativo en la esquina.
+        <div className="pointer-events-none absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
+      )}
+
+      <div className="relative flex items-center justify-between gap-2">
+        <p
+          className={`text-xs font-medium uppercase tracking-wide truncate ${
+            featured ? "text-white/80" : "text-muted"
+          }`}
+        >
+          {label}
+        </p>
+        <div
+          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${iconClass}`}
+        >
+          {icon}
+        </div>
+      </div>
+
+      <div
+        className={`relative text-2xl sm:text-[1.7rem] leading-none font-semibold tracking-tight tabular-nums truncate ${
+          featured ? "text-white" : valueClass
+        }`}
+      >
+        {value}
+      </div>
+
+      {footer && (
+        <div
+          className={`relative text-xs min-w-0 ${
+            featured ? "text-white/80" : "text-muted"
+          }`}
+        >
+          {footer}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Stats del período elegido (no dependen del filtro de estado ni de la búsqueda).
  * Los empleados no ven los totales del comercio: solo el último pago.
@@ -34,86 +111,109 @@ export default function StatsBar({
   onlyLastPayment?: boolean;
 }) {
   const approved = payments.filter((p) => p.status === "approved");
+  const pendingCount = payments.filter((p) => p.status === "pending").length;
+  const rejectedCount = payments.filter((p) => p.status === "rejected").length;
   const totalApproved = approved.reduce((sum, p) => sum + p.amount, 0);
+  const approvedPct =
+    payments.length > 0
+      ? Math.round((approved.length / payments.length) * 100)
+      : 0;
   // La API devuelve los pagos ordenados del más nuevo al más viejo.
   const last = payments[0];
 
-  const lastPaymentStat = {
-    label: "Último pago",
-    value: last ? formatCurrency(last.amount) : "—",
-    detail: last
-      ? `#${last.externalId} · ${formatTime(last.createdAt)} · ${STATUS_LABELS[last.status]}`
-      : "Sin pagos en el período",
-    accent: "text-foreground",
-    bg: "bg-background",
-    icon: <IconClock className="w-4 h-4 text-muted" />,
-  };
+  const lastPaymentCard = (
+    <StatCard
+      label="Último pago"
+      icon={<IconBolt className="w-5 h-5" />}
+      iconClass="bg-warning-bg text-warning-fg"
+      value={
+        last ? (
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="truncate">{formatCurrency(last.amount)}</span>
+            <StatusBadge status={last.status} />
+          </span>
+        ) : (
+          <span className="text-muted-light">—</span>
+        )
+      }
+      footer={
+        last ? (
+          <div className="space-y-0.5 min-w-0">
+            <p className="truncate text-foreground font-medium">
+              {last.payerName}
+            </p>
+            <p className="truncate font-mono" title={last.externalId}>
+              #{last.externalId} · {formatTime(last.createdAt)}
+            </p>
+          </div>
+        ) : (
+          "Sin pagos en el período"
+        )
+      }
+    />
+  );
 
-  const stats = onlyLastPayment ? [lastPaymentStat] : [
-    {
-      label: "Pagos recibidos",
-      value: String(payments.length),
-      detail: null,
-      accent: "text-foreground",
-      bg: "bg-primary-light",
-      icon: <IconWallet className="w-4 h-4 text-primary" />,
-    },
-    {
-      label: "Acreditados",
-      value: String(approved.length),
-      detail:
-        payments.length > 0
-          ? `${Math.round((approved.length / payments.length) * 100)}% del total`
-          : null,
-      accent: "text-success-fg",
-      bg: "bg-success-bg",
-      icon: <IconCheck className="w-4 h-4 text-success" />,
-    },
-    {
-      label: "Total acreditado",
-      value: formatCurrency(totalApproved),
-      detail: null,
-      accent: "text-primary",
-      bg: "bg-primary-light",
-      icon: <span className="text-base">💰</span>,
-    },
-    lastPaymentStat,
-  ];
+  if (onlyLastPayment) {
+    return <div className="sm:max-w-sm">{lastPaymentCard}</div>;
+  }
+
+  const breakdown = [
+    pendingCount > 0 && plural(pendingCount, "pendiente", "pendientes"),
+    rejectedCount > 0 && plural(rejectedCount, "rechazado", "rechazados"),
+  ].filter(Boolean);
 
   return (
-    <div
-      className={
-        onlyLastPayment
-          ? "grid grid-cols-1 sm:max-w-sm"
-          : "grid grid-cols-2 lg:grid-cols-4 gap-3"
-      }
-    >
-      {stats.map((stat) => (
-        <div
-          key={stat.label}
-          className="bg-card border border-card-border rounded-xl p-4 flex items-center gap-3 min-w-0"
-        >
-          <div
-            className={`w-10 h-10 rounded-lg ${stat.bg} flex items-center justify-center shrink-0`}
-          >
-            {stat.icon}
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      <StatCard
+        label="Total acreditado"
+        featured
+        icon={<IconBanknotes className="w-5 h-5" />}
+        iconClass="bg-white/15 text-white"
+        value={formatCurrency(totalApproved)}
+        footer={
+          approved.length > 0
+            ? `Promedio ${formatCurrency(totalApproved / approved.length)} por pago`
+            : "Todavía no hay pagos acreditados"
+        }
+      />
+
+      <StatCard
+        label="Pagos recibidos"
+        icon={<IconInboxArrowDown className="w-5 h-5" />}
+        iconClass="bg-primary-light text-primary"
+        value={payments.length}
+        footer={
+          breakdown.length > 0 ? breakdown.join(" · ") : "Todos acreditados"
+        }
+      />
+
+      <StatCard
+        label="Acreditados"
+        icon={<IconCheckBadge className="w-5 h-5" />}
+        iconClass="bg-success-bg text-success-fg"
+        value={approved.length}
+        valueClass="text-success-fg"
+        footer={
+          <div className="flex items-center gap-2">
+            <div
+              className="flex-1 h-1.5 rounded-full bg-card-border overflow-hidden"
+              role="progressbar"
+              aria-valuenow={approvedPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Porcentaje de pagos acreditados"
+            >
+              <div
+                className="h-full rounded-full bg-success transition-[width] duration-500"
+                style={{ width: `${approvedPct}%` }}
+              />
+            </div>
+            <span className="tabular-nums">{approvedPct}%</span>
           </div>
-          <div className="min-w-0">
-            <p className="text-xs text-muted truncate">{stat.label}</p>
-            <p className={`text-lg font-bold ${stat.accent} truncate`}>
-              {stat.value}
-            </p>
-            {stat.detail && (
-              <p
-                className="text-[11px] text-muted truncate"
-                title={stat.detail}
-              >
-                {stat.detail}
-              </p>
-            )}
-          </div>
-        </div>
-      ))}
+        }
+      />
+
+      {lastPaymentCard}
     </div>
   );
 }
