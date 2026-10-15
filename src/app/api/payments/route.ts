@@ -4,7 +4,9 @@ import { PaymentsResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-function toPayment(row: DbPayment) {
+type PaymentRow = DbPayment & { wallets: { alias: string } | null };
+
+function toPayment(row: PaymentRow) {
   return {
     id: `PAY-${row.provider_payment_id}`,
     externalId: row.provider_payment_id,
@@ -18,6 +20,8 @@ function toPayment(row: DbPayment) {
     updatedAt: row.provider_updated_at,
     paymentMethod: row.payment_method ?? "",
     wallet: WALLET_PROVIDER_LABELS[row.provider] ?? row.provider,
+    walletProvider: row.provider,
+    walletAlias: row.wallets?.alias ?? "",
   };
 }
 
@@ -66,12 +70,12 @@ export async function GET() {
 
   const { data: rows } = await supabase
     .from("payments")
-    .select("*")
+    .select("*, wallets(alias)")
     .eq("organization_id", profile.organization_id)
     .order("provider_created_at", { ascending: false })
     .limit(100);
 
-  const payments = (rows ?? []).map(toPayment);
+  const payments = ((rows ?? []) as PaymentRow[]).map(toPayment);
 
   const response: PaymentsResponse = {
     payments,

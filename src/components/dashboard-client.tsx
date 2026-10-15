@@ -138,6 +138,7 @@ export default function DashboardClient({
       return (
         p.payerName.toLowerCase().includes(q) ||
         amountStr.includes(q) ||
+        p.externalId.includes(q) ||
         p.description.toLowerCase().includes(q)
       );
     }

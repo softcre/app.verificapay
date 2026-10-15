@@ -46,7 +46,7 @@ export async function GET() {
 
   const { data: wallet } = await supabase
     .from("wallets")
-    .select("id, collector_id")
+    .select("id, collector_id, alias")
     .eq("organization_id", profile.organization_id)
     .eq("provider", "mercado_pago")
     .eq("status", "active")
@@ -84,6 +84,8 @@ export async function GET() {
         updatedAt: p.updatedAt,
         paymentMethod: p.paymentMethod,
         wallet: WALLET_PROVIDER_LABELS.mercado_pago,
+        walletProvider: "mercado_pago" as const,
+        walletAlias: wallet.alias ?? "",
       }));
 
     const response: PaymentsResponse = {

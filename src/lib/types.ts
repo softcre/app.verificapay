@@ -1,3 +1,5 @@
+import type { WalletProvider } from "./database.types";
+
 export type PaymentStatus = "approved" | "pending" | "rejected";
 
 export interface Payment {
@@ -13,6 +15,9 @@ export interface Payment {
   updatedAt: string;
   paymentMethod: string;
   wallet: string;
+  walletProvider: WalletProvider;
+  // Nombre que el dueño le puso a la billetera (wallets.alias).
+  walletAlias: string;
 }
 
 export interface PaymentsResponse {
