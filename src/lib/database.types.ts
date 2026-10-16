@@ -60,6 +60,22 @@ export interface Wallet {
   updated_at: string;
   last_synced_at?: string | null;
   sync_started_at?: string | null;
+  last_webhook_at?: string | null;
+  last_error?: string | null;
+  last_error_at?: string | null;
+}
+
+export type IntegrationEventSource = "sync" | "webhook" | "token" | "oauth";
+
+export interface IntegrationEvent {
+  id: string;
+  organization_id: string | null;
+  wallet_id: string | null;
+  source: IntegrationEventSource;
+  level: "error" | "warning";
+  message: string;
+  detail: Record<string, unknown> | null;
+  created_at: string;
 }
 
 export interface DbPayment {

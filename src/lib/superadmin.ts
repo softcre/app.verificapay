@@ -1,4 +1,31 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+
+/**
+ * Para las páginas del panel: devuelve el cliente y el perfil del superadmin,
+ * o redirige si no hay sesión o el usuario no es superadmin.
+ */
+export async function requireSuperadminPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, full_name, email")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) redirect("/login");
+
+  // El panel es exclusivo del superadmin: un owner o cajero no administra comercios ajenos.
+  if (profile.role !== "superadmin") redirect("/pagos");
+
+  return { supabase, profile };
+}
 
 /**
  * Verifica que quien llama sea superadmin. Las escrituras del panel se hacen

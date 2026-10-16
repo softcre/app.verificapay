@@ -38,7 +38,7 @@ export default function PlansManager({
   const closeForm = useCallback(() => setShowForm(false), []);
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-foreground mb-1">
@@ -83,7 +83,7 @@ export default function PlansManager({
           <p className="text-sm text-muted">Todavía no hay planes.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3 items-start">
           {plans.map((plan) => (
             <PlanCard
               key={plan.id}

@@ -149,6 +149,14 @@ end $$;
 alter table public.wallets add column if not exists last_synced_at timestamptz;
 alter table public.wallets add column if not exists sync_started_at timestamptz;
 
+-- Salud de la integración (panel de superadmin):
+--   last_webhook_at: último aviso del proveedor procesado bien.
+--   last_error / last_error_at: último fallo de sincronización, webhook o
+--   token; se limpia con la próxima sincronización exitosa.
+alter table public.wallets add column if not exists last_webhook_at timestamptz;
+alter table public.wallets add column if not exists last_error text;
+alter table public.wallets add column if not exists last_error_at timestamptz;
+
 create index if not exists wallets_organization_id_idx on public.wallets(organization_id);
 create unique index if not exists wallets_collector_id_idx on public.wallets(provider, collector_id) where collector_id is not null;
 
@@ -215,6 +223,45 @@ drop trigger if exists payments_set_updated_at on public.payments;
 create trigger payments_set_updated_at
   before update on public.payments
   for each row execute function public.set_updated_at();
+
+-- ============================================================
+-- INTEGRATION_EVENTS (registro de fallos de las integraciones)
+-- ============================================================
+-- Lo escribe el server con la service_role key (sincronización, webhook,
+-- renovación de tokens, OAuth); solo el superadmin lo lee. organization_id
+-- y wallet_id pueden ser null: p. ej. un webhook de una cuenta que no está
+-- conectada a ningún comercio.
+create table if not exists public.integration_events (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid references public.organizations(id) on delete cascade,
+  wallet_id uuid references public.wallets(id) on delete cascade,
+  source text not null check (source in ('sync', 'webhook', 'token', 'oauth')),
+  level text not null default 'error' check (level in ('error', 'warning')),
+  message text not null,
+  detail jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists integration_events_created_at_idx on public.integration_events(created_at desc);
+create index if not exists integration_events_organization_id_idx on public.integration_events(organization_id, created_at desc);
+
+-- Estadísticas de pagos (todos los comercios si org es null). security
+-- invoker: corre con la RLS de quien llama, así cada uno ve solo lo suyo.
+create or replace function public.payment_stats(org uuid default null, since timestamptz default now() - interval '30 days')
+returns table (payments bigint, approved bigint, approved_amount numeric)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select
+    count(*),
+    count(*) filter (where status = 'approved'),
+    coalesce(sum(amount) filter (where status = 'approved'), 0)
+  from public.payments
+  where provider_created_at >= since
+    and (org is null or organization_id = org);
+$$;
 
 -- ============================================================
 -- Helper: organización del usuario autenticado (evita recursión en RLS)
@@ -377,7 +424,14 @@ create trigger organizations_protect_plan
 -- RLS
 -- ============================================================
 alter table public.plans enable row level security;
+alter table public.integration_events enable row level security;
 alter table public.organizations enable row level security;
+
+-- integration_events: solo el superadmin lee; nadie escribe por RLS.
+drop policy if exists "integration_events: select (superadmin)" on public.integration_events;
+create policy "integration_events: select (superadmin)"
+  on public.integration_events for select
+  using (public.current_role() = 'superadmin');
 alter table public.profiles enable row level security;
 alter table public.wallets enable row level security;
 alter table public.payments replica identity full;

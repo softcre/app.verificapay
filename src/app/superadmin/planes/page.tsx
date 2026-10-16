@@ -1,34 +1,11 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/sidebar";
 import TopBar from "@/components/top-bar";
 import PlansManager from "@/components/plans-manager";
 import { Plan } from "@/lib/database.types";
+import { requireSuperadminPage } from "@/lib/superadmin";
 
 export default async function PlanesPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, full_name, email")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) {
-    redirect("/login");
-  }
-
-  if (profile.role !== "superadmin") {
-    redirect("/pagos");
-  }
+  const { supabase, profile } = await requireSuperadminPage();
 
   const [{ data: plans }, { data: orgs }] = await Promise.all([
     supabase

@@ -8,6 +8,7 @@ import {
 } from "@/lib/mercadopago";
 import { withMercadoPagoToken } from "@/lib/mercadopago-wallet";
 import { toMercadoPagoDate } from "@/lib/period";
+import { recordWalletError } from "@/lib/integration-events";
 
 // La API de la billetera es la fuente de los pagos (el webhook de MP no avisa
 // de las transferencias que llegan desde otras billeteras). Para que el costo
@@ -125,7 +126,7 @@ export async function syncWalletPayments(
 
     await supabase
       .from("wallets")
-      .update({ last_synced_at: nextCursor })
+      .update({ last_synced_at: nextCursor, last_error: null, last_error_at: null })
       .eq("id", wallet.id);
 
     return "synced";
@@ -133,6 +134,7 @@ export async function syncWalletPayments(
     // El turno queda tomado: una billetera que falla se reintenta recién en
     // el próximo intervalo, no en cada pedido de cada pantalla.
     console.error(`Error sincronizando la billetera ${wallet.id}:`, err);
+    await recordWalletError(wallet, "sync", err);
     return err instanceof MercadoPagoAuthError ? "auth_error" : "error";
   }
 }

@@ -9,6 +9,7 @@ import {
   IconSettings,
   IconMenu,
   IconClose,
+  IconBolt,
   IconCube,
   IconStore,
 } from "./icons";
@@ -32,6 +33,12 @@ const NAV_ITEMS = [
     href: "/superadmin/planes",
     superadminOnly: true,
   },
+  {
+    label: "Integraciones",
+    icon: IconBolt,
+    href: "/superadmin/integraciones",
+    superadminOnly: true,
+  },
 ];
 
 export default function Sidebar({ role }: { role?: UserRole }) {
@@ -43,6 +50,12 @@ export default function Sidebar({ role }: { role?: UserRole }) {
     if (item.hideForSuperadmin && role === "superadmin") return false;
     return true;
   });
+  // El ítem activo es el de href más largo que contenga la ruta actual, así
+  // /superadmin/comercios/x marca "Comercios" y /superadmin/planes, "Planes".
+  const activeHref = navItems
+    .map((item) => item.href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0];
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -68,7 +81,7 @@ export default function Sidebar({ role }: { role?: UserRole }) {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = item.href === pathname;
+          const isActive = item.href === activeHref;
           return (
             <a
               key={item.label}

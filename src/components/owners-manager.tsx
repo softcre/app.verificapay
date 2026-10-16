@@ -27,7 +27,8 @@ export type OwnerWithOrg = Profile & {
     invite_code: string;
     plan_id: string | null;
   } | null;
-  usage: { employees: number; wallets: number };
+  /** walletIssues: billeteras desconectadas o con fallos de integración. */
+  usage: { employees: number; wallets: number; walletIssues: number };
 };
 
 const ALL = "all";
@@ -58,7 +59,7 @@ export default function OwnersManager({
   });
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-foreground mb-1">
@@ -299,11 +300,14 @@ function OwnerRow({
             {initials(owner.full_name)}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">
-              {owner.full_name}
-            </p>
-            <p className="text-xs text-muted truncate">
+            <a
+              href={`/superadmin/comercios/${owner.organization_id}`}
+              className="block text-sm font-medium text-foreground truncate hover:text-primary hover:underline"
+            >
               {owner.organizations?.name ?? "—"}
+            </a>
+            <p className="text-xs text-muted truncate">
+              {owner.full_name}
               {owner.email ? ` · ${owner.email}` : ""}
             </p>
             <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
@@ -320,6 +324,16 @@ function OwnerRow({
                 used={owner.usage.wallets}
                 limit={plan?.max_wallets ?? null}
               />
+              {owner.usage.walletIssues > 0 && (
+                <a
+                  href={`/superadmin/comercios/${owner.organization_id}`}
+                  className="px-2 py-0.5 rounded-full bg-danger-bg text-danger-fg text-[11px] font-semibold hover:underline"
+                >
+                  {owner.usage.walletIssues === 1
+                    ? "1 billetera con error"
+                    : `${owner.usage.walletIssues} billeteras con error`}
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -335,6 +349,12 @@ function OwnerRow({
             {isActive ? "Activo" : "Suspendido"}
           </span>
 
+          <a
+            href={`/superadmin/comercios/${owner.organization_id}`}
+            className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg border border-card-border text-xs text-muted hover:text-foreground"
+          >
+            Ver detalle
+          </a>
           <button
             onClick={() => setEditing((v) => !v)}
             disabled={pending}

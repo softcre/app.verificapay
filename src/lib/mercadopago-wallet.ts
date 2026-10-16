@@ -3,6 +3,7 @@ import {
   MercadoPagoAuthError,
   refreshMercadoPagoToken,
 } from "@/lib/mercadopago";
+import { errorMessage, logIntegrationEvent } from "@/lib/integration-events";
 
 // Los tokens viven en `wallet_credentials`, que no tiene policies de RLS: solo
 // se leen y escriben acá, server-side, con la service key. Quien llame a estas
@@ -74,10 +75,10 @@ async function renewAccessToken(
   }
 
   if (!current?.refresh_token) {
-    await markWalletAsError(walletId);
-    throw new MercadoPagoAuthError(
-      "La billetera no tiene refresh token; hay que volver a conectarla"
-    );
+    const reason =
+      "La billetera no tiene refresh token; hay que volver a conectarla";
+    await markWalletAsError(walletId, reason);
+    throw new MercadoPagoAuthError(reason);
   }
 
   let tokens;
@@ -85,10 +86,10 @@ async function renewAccessToken(
     tokens = await refreshMercadoPagoToken(current.refresh_token);
   } catch (err) {
     console.error("No se pudo renovar el token de Mercado Pago:", err);
-    await markWalletAsError(walletId);
-    throw new MercadoPagoAuthError(
-      "No se pudo renovar el token; hay que volver a conectar la billetera"
-    );
+    const reason =
+      "No se pudo renovar el token; hay que volver a conectar la billetera";
+    await markWalletAsError(walletId, `${reason} (${errorMessage(err)})`);
+    throw new MercadoPagoAuthError(reason);
   }
 
   const { error } = await saveWalletCredentials(walletId, {
@@ -102,7 +103,23 @@ async function renewAccessToken(
   return tokens.access_token;
 }
 
-async function markWalletAsError(walletId: string) {
+async function markWalletAsError(walletId: string, reason: string) {
   const supabase = createServiceClient();
-  await supabase.from("wallets").update({ status: "error" }).eq("id", walletId);
+  const { data: wallet } = await supabase
+    .from("wallets")
+    .update({
+      status: "error",
+      last_error: reason,
+      last_error_at: new Date().toISOString(),
+    })
+    .eq("id", walletId)
+    .select("organization_id")
+    .maybeSingle();
+
+  await logIntegrationEvent({
+    source: "token",
+    message: reason,
+    organizationId: wallet?.organization_id,
+    walletId,
+  });
 }
