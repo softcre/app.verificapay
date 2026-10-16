@@ -9,6 +9,8 @@ import {
   IconSettings,
   IconMenu,
   IconClose,
+  IconCube,
+  IconStore,
 } from "./icons";
 import { UserRole } from "@/lib/database.types";
 
@@ -20,8 +22,14 @@ const NAV_ITEMS = [
   { label: "Billeteras", icon: IconSettings, href: "/wallets", hideForSuperadmin: true },
   {
     label: "Comercios",
-    icon: IconUsers,
+    icon: IconStore,
     href: "/superadmin",
+    superadminOnly: true,
+  },
+  {
+    label: "Planes",
+    icon: IconCube,
+    href: "/superadmin/planes",
     superadminOnly: true,
   },
 ];

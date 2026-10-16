@@ -8,7 +8,7 @@ import {
   useState,
   useTransition,
 } from "react";
-import { Profile } from "@/lib/database.types";
+import { Plan, Profile } from "@/lib/database.types";
 import {
   createOwner,
   deleteOwner,
@@ -16,22 +16,49 @@ import {
   updateOwner,
   OwnerActionState,
 } from "@/app/superadmin/actions";
-import { IconUsers, IconCheck, IconClose } from "./icons";
+import { formatLimit } from "@/lib/plans";
+import { IconUsers, IconCheck, IconClose, IconSearch } from "./icons";
 
 const initialState: OwnerActionState = {};
 
-type OwnerWithOrg = Profile & {
-  organizations: { name: string; invite_code: string } | null;
+export type OwnerWithOrg = Profile & {
+  organizations: {
+    name: string;
+    invite_code: string;
+    plan_id: string | null;
+  } | null;
+  usage: { employees: number; wallets: number };
 };
 
-export default function OwnersManager({ owners }: { owners: OwnerWithOrg[] }) {
+const ALL = "all";
+
+export default function OwnersManager({
+  owners,
+  plans,
+}: {
+  owners: OwnerWithOrg[];
+  plans: Plan[];
+}) {
   const [showForm, setShowForm] = useState(false);
   const [rowFeedback, setRowFeedback] = useState<OwnerActionState>({});
+  const [query, setQuery] = useState("");
+  const [planFilter, setPlanFilter] = useState(ALL);
 
   const active = owners.filter((o) => o.status === "active").length;
+  const plansById = new Map(plans.map((p) => [p.id, p]));
+
+  const q = query.trim().toLowerCase();
+  const visible = owners.filter((o) => {
+    if (planFilter !== ALL && o.organizations?.plan_id !== planFilter)
+      return false;
+    if (!q) return true;
+    return [o.full_name, o.email, o.organizations?.name]
+      .filter(Boolean)
+      .some((v) => v!.toLowerCase().includes(q));
+  });
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-foreground mb-1">
@@ -52,7 +79,7 @@ export default function OwnersManager({ owners }: { owners: OwnerWithOrg[] }) {
         </button>
       </div>
 
-      {showForm && <CreateOwnerForm />}
+      {showForm && <CreateOwnerForm plans={plans} />}
 
       {rowFeedback.error && (
         <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
@@ -73,17 +100,89 @@ export default function OwnersManager({ owners }: { owners: OwnerWithOrg[] }) {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {owners.map((owner) => (
-            <OwnerRow key={owner.id} owner={owner} onFeedback={setRowFeedback} />
-          ))}
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <IconSearch className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar por comercio, dueño o email"
+                aria-label="Buscar comercio"
+                className={`${INPUT_CLASS} pl-9`}
+              />
+            </div>
+            <select
+              value={planFilter}
+              onChange={(e) => setPlanFilter(e.target.value)}
+              aria-label="Filtrar por plan"
+              className={`${INPUT_CLASS} sm:w-48`}
+            >
+              <option value={ALL}>Todos los planes</option>
+              {plans.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {visible.length === 0 ? (
+            <p className="text-sm text-muted text-center py-6">
+              Ningún comercio coincide con la búsqueda.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {visible.map((owner) => (
+                <OwnerRow
+                  key={owner.id}
+                  owner={owner}
+                  plan={
+                    owner.organizations?.plan_id
+                      ? plansById.get(owner.organizations.plan_id) ?? null
+                      : null
+                  }
+                  plans={plans}
+                  onFeedback={setRowFeedback}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function CreateOwnerForm() {
+/** Planes que se pueden elegir: los activos, más el actual aunque esté inactivo. */
+function PlanSelect({
+  plans,
+  currentPlanId,
+}: {
+  plans: Plan[];
+  currentPlanId?: string | null;
+}) {
+  const options = plans.filter((p) => p.is_active || p.id === currentPlanId);
+  const defaultPlan = plans.find((p) => p.is_default);
+  return (
+    <select
+      name="planId"
+      required
+      defaultValue={currentPlanId ?? defaultPlan?.id ?? ""}
+      className={INPUT_CLASS}
+    >
+      {options.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.name} · {formatLimit(p.max_employees)} cajeros ·{" "}
+          {formatLimit(p.max_wallets)} billeteras
+          {p.is_active ? "" : " (inactivo)"}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function CreateOwnerForm({ plans }: { plans: Plan[] }) {
   const [state, formAction, pending] = useActionState(
     createOwner,
     initialState
@@ -141,6 +240,9 @@ function CreateOwnerForm() {
             />
           </Field>
         </div>
+        <Field label="Plan">
+          <PlanSelect plans={plans} />
+        </Field>
 
         {state.error && (
           <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">
@@ -167,9 +269,13 @@ function CreateOwnerForm() {
 
 function OwnerRow({
   owner,
+  plan,
+  plans,
   onFeedback,
 }: {
   owner: OwnerWithOrg;
+  plan: Plan | null;
+  plans: Plan[];
   onFeedback: (state: OwnerActionState) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -200,6 +306,21 @@ function OwnerRow({
               {owner.organizations?.name ?? "—"}
               {owner.email ? ` · ${owner.email}` : ""}
             </p>
+            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+              <span className="px-2 py-0.5 rounded-full bg-primary-light text-primary text-[11px] font-semibold">
+                {plan?.name ?? "Sin plan"}
+              </span>
+              <UsageChip
+                label="cajeros"
+                used={owner.usage.employees}
+                limit={plan?.max_employees ?? null}
+              />
+              <UsageChip
+                label="billeteras"
+                used={owner.usage.wallets}
+                limit={plan?.max_wallets ?? null}
+              />
+            </div>
           </div>
         </div>
 
@@ -272,26 +393,65 @@ function OwnerRow({
         </p>
       )}
 
-      {editing && <EditOwnerForm owner={owner} onDone={closeEdit} />}
+      {editing && (
+        <EditOwnerForm
+          owner={owner}
+          plans={plans}
+          onDone={closeEdit}
+          onFeedback={onFeedback}
+        />
+      )}
     </div>
+  );
+}
+
+/** "3/5 cajeros"; en amarillo si llegó al tope, en rojo si lo superó. */
+function UsageChip({
+  label,
+  used,
+  limit,
+}: {
+  label: string;
+  used: number;
+  limit: number | null;
+}) {
+  const tone =
+    limit != null && used > limit
+      ? "bg-danger-bg text-danger-fg"
+      : limit != null && used >= limit
+        ? "bg-warning-bg text-warning-fg"
+        : "bg-background text-muted";
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${tone}`}>
+      {used}/{formatLimit(limit)} {label}
+    </span>
   );
 }
 
 function EditOwnerForm({
   owner,
+  plans,
   onDone,
+  onFeedback,
 }: {
   owner: OwnerWithOrg;
+  plans: Plan[];
   onDone: () => void;
+  onFeedback: (state: OwnerActionState) => void;
 }) {
   const [state, formAction, pending] = useActionState(
     updateOwner,
     initialState
   );
 
+  // El éxito se muestra arriba de la lista: el form se cierra y puede traer
+  // un aviso (p. ej. si el comercio quedó por encima del plan nuevo).
   useEffect(() => {
-    if (state.success) onDone();
-  }, [state.success, onDone]);
+    if (state.success) {
+      onFeedback(state);
+      onDone();
+    }
+  }, [state, onDone, onFeedback]);
 
   return (
     <form
@@ -327,6 +487,12 @@ function EditOwnerForm({
           />
         </Field>
       </div>
+      <Field label="Plan">
+        <PlanSelect
+          plans={plans}
+          currentPlanId={owner.organizations?.plan_id}
+        />
+      </Field>
 
       {state.error && (
         <p className="text-sm text-danger-fg bg-danger-bg rounded-lg px-3 py-2">

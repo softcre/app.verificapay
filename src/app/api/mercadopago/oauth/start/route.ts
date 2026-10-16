@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getMercadoPagoAuthorizationUrl } from "@/lib/mercadopago";
+import { getPlanUsage, isProviderAllowed } from "@/lib/plans";
 import {
   getMercadoPagoRedirectUri,
   getSiteUrl,
@@ -22,12 +23,21 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, organization_id")
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "owner") {
+  if (!profile || profile.role !== "owner") {
     return Response.redirect(`${getSiteUrl()}/wallets?mp_error=solo_owner`);
+  }
+
+  // El tope de billeteras se valida en el callback: acá todavía no se sabe
+  // si es una cuenta nueva o una reconexión (que no suma).
+  const usage = await getPlanUsage(supabase, profile.organization_id);
+  if (!isProviderAllowed(usage.plan, "mercado_pago")) {
+    return Response.redirect(
+      `${getSiteUrl()}/wallets?mp_error=proveedor_no_incluido`
+    );
   }
 
   const state = crypto.randomBytes(24).toString("hex");

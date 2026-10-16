@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/sidebar";
 import TopBar from "@/components/top-bar";
 import WalletsManager from "@/components/wallets-manager";
+import { getPlanUsage } from "@/lib/plans";
 
 export default async function WalletsPage({
   searchParams,
@@ -34,13 +35,16 @@ export default async function WalletsPage({
     redirect("/superadmin");
   }
 
-  const { data: wallets } = await supabase
-    .from("wallets")
-    // Columnas explícitas: todo lo que se lee acá termina en el navegador.
-    .select(
-      "id, organization_id, provider, alias, public_key, external_user_id, collector_id, status, connected_by, created_at, updated_at"
-    )
-    .order("created_at", { ascending: false });
+  const [{ data: wallets }, usage] = await Promise.all([
+    supabase
+      .from("wallets")
+      // Columnas explícitas: todo lo que se lee acá termina en el navegador.
+      .select(
+        "id, organization_id, provider, alias, public_key, external_user_id, collector_id, status, connected_by, created_at, updated_at"
+      )
+      .order("created_at", { ascending: false }),
+    getPlanUsage(supabase, profile.organization_id),
+  ]);
 
   const org = profile.organizations as unknown as {
     name: string;
@@ -67,6 +71,11 @@ export default async function WalletsPage({
             wallets={wallets ?? []}
             role={profile.role}
             inviteCode={org?.invite_code ?? ""}
+            plan={{
+              name: usage.plan?.name ?? null,
+              maxWallets: usage.plan?.max_wallets ?? null,
+              allowedProviders: usage.plan?.allowed_providers ?? null,
+            }}
             mpNotice={{
               connected: params.mp_connected === "1",
               error: params.mp_error,

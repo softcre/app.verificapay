@@ -14,6 +14,47 @@ create table if not exists public.organizations (
 );
 
 -- ============================================================
+-- PLANS (paquetes del SaaS: límites que se le asignan a cada comercio)
+-- ============================================================
+-- max_employees / max_wallets en null = ilimitado.
+-- is_active = false: el plan deja de ofrecerse, pero los comercios que ya lo
+-- tienen lo conservan. is_default: plan que se preselecciona en altas nuevas.
+create table if not exists public.plans (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  description text,
+  price numeric not null default 0 check (price >= 0),
+  currency text not null default 'ARS',
+  max_employees integer check (max_employees >= 0),
+  max_wallets integer check (max_wallets >= 0),
+  allowed_providers text[] not null default array['mercado_pago', 'naranja_x', 'uala', 'cuenta_dni', 'modo'],
+  is_active boolean not null default true,
+  is_default boolean not null default false,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists plans_single_default_idx on public.plans(is_default) where is_default;
+
+insert into public.plans (name, description, price, max_employees, max_wallets, allowed_providers, is_default, sort_order)
+values
+  ('Básico', 'Para comercios chicos con una sola caja.', 0, 2, 1, array['mercado_pago'], true, 1),
+  ('Profesional', 'Varias cajas y billeteras.', 0, 10, 3, array['mercado_pago', 'naranja_x', 'uala', 'cuenta_dni', 'modo'], false, 2),
+  ('Empresa', 'Sin límites de cajeros ni billeteras.', 0, null, null, array['mercado_pago', 'naranja_x', 'uala', 'cuenta_dni', 'modo'], false, 3)
+on conflict (name) do nothing;
+
+alter table public.organizations add column if not exists plan_id uuid references public.plans(id) on delete restrict;
+
+-- Delta idempotente: los comercios creados antes de los planes quedan en el
+-- plan por defecto.
+update public.organizations
+  set plan_id = (select id from public.plans where is_default limit 1)
+  where plan_id is null;
+
+create index if not exists organizations_plan_id_idx on public.organizations(plan_id);
+
+-- ============================================================
 -- PROFILES (usuarios: dueños y empleados), 1:1 con auth.users
 -- ============================================================
 create table if not exists public.profiles (
@@ -209,12 +250,145 @@ as $$
 $$;
 
 -- ============================================================
+-- Límites del plan (última barrera: la app valida antes para dar un
+-- mensaje claro, pero acá no se puede saltear por ningún camino).
+-- ============================================================
+drop trigger if exists plans_set_updated_at on public.plans;
+create trigger plans_set_updated_at
+  before update on public.plans
+  for each row execute function public.set_updated_at();
+
+create or replace function public.enforce_employee_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  limit_value integer;
+  used integer;
+begin
+  if new.role <> 'employee' then
+    return new;
+  end if;
+
+  -- Bloquea la fila del comercio para que dos altas simultáneas no pasen
+  -- las dos el chequeo.
+  select p.max_employees into limit_value
+    from public.organizations o
+    left join public.plans p on p.id = o.plan_id
+    where o.id = new.organization_id
+    for update of o;
+
+  if limit_value is null then
+    return new;
+  end if;
+
+  select count(*) into used
+    from public.profiles
+    where organization_id = new.organization_id and role = 'employee';
+
+  if used >= limit_value then
+    raise exception 'plan_limit_employees' using errcode = 'P0001';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_enforce_employee_limit on public.profiles;
+create trigger profiles_enforce_employee_limit
+  before insert on public.profiles
+  for each row execute function public.enforce_employee_limit();
+
+create or replace function public.enforce_wallet_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  limit_value integer;
+  providers text[];
+  used integer;
+begin
+  select p.max_wallets, p.allowed_providers into limit_value, providers
+    from public.organizations o
+    left join public.plans p on p.id = o.plan_id
+    where o.id = new.organization_id
+    for update of o;
+
+  if providers is not null and not (new.provider = any(providers)) then
+    raise exception 'plan_provider_not_allowed' using errcode = 'P0001';
+  end if;
+
+  if limit_value is null then
+    return new;
+  end if;
+
+  select count(*) into used
+    from public.wallets
+    where organization_id = new.organization_id;
+
+  if used >= limit_value then
+    raise exception 'plan_limit_wallets' using errcode = 'P0001';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists wallets_enforce_limit on public.wallets;
+create trigger wallets_enforce_limit
+  before insert on public.wallets
+  for each row execute function public.enforce_wallet_limit();
+
+-- El owner puede actualizar su comercio por RLS, pero el plan solo lo
+-- cambia el superadmin (o el server con la service_role key, sin auth.uid()).
+-- Un comercio nuevo sin plan (o dado de alta por un usuario común) arranca
+-- en el plan por defecto.
+create or replace function public.protect_organization_plan()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  privileged boolean := auth.uid() is null or public.current_role() = 'superadmin';
+begin
+  if tg_op = 'INSERT' then
+    if new.plan_id is null or not privileged then
+      new.plan_id := (select id from public.plans where is_default limit 1);
+    end if;
+  elsif new.plan_id is distinct from old.plan_id and not privileged then
+    raise exception 'plan_change_not_allowed' using errcode = 'P0001';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists organizations_protect_plan on public.organizations;
+create trigger organizations_protect_plan
+  before insert or update on public.organizations
+  for each row execute function public.protect_organization_plan();
+
+-- ============================================================
 -- RLS
 -- ============================================================
+alter table public.plans enable row level security;
 alter table public.organizations enable row level security;
 alter table public.profiles enable row level security;
 alter table public.wallets enable row level security;
 alter table public.payments replica identity full;
+
+-- plans: cualquier usuario autenticado puede LEER los planes (el owner ve los
+-- límites del suyo). Las escrituras las hace el superadmin desde el server
+-- con la service_role key.
+drop policy if exists "plans: select authenticated" on public.plans;
+create policy "plans: select authenticated"
+  on public.plans for select
+  using (auth.uid() is not null);
 
 -- organizations: cualquier usuario autenticado puede LEER su propia organización
 drop policy if exists "org: select own" on public.organizations;

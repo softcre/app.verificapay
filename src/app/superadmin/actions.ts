@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ProfileStatus } from "@/lib/database.types";
+import { requireSuperadmin } from "@/lib/superadmin";
+import { formatLimit, getPlanUsage } from "@/lib/plans";
 
 export interface OwnerActionState {
   error?: string;
@@ -12,34 +14,14 @@ export interface OwnerActionState {
 
 const MIN_PASSWORD_LENGTH = 8;
 
-/**
- * Verifica que quien llama sea superadmin. Las escrituras se hacen con la
- * service_role key (hace falta para la API de auth.admin), que ignora RLS:
- * este guard es la única barrera.
- */
-async function requireSuperadmin(): Promise<
-  { superadminId: string } | { error: string }
-> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { error: "Sesión expirada. Volvé a iniciar sesión." };
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, status")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) return { error: "No se encontró tu perfil." };
-  if (profile.role !== "superadmin")
-    return { error: "Solo un superadmin puede administrar comercios." };
-  if (profile.status !== "active")
-    return { error: "Tu cuenta está suspendida." };
-
-  return { superadminId: user.id };
+/** Confirma que el plan exista antes de asignarlo a un comercio. */
+async function findPlan(service: SupabaseClient, planId: string) {
+  const { data } = await service
+    .from("plans")
+    .select("id, name, max_employees, max_wallets")
+    .eq("id", planId)
+    .maybeSingle();
+  return data;
 }
 
 /**
@@ -79,10 +61,12 @@ export async function createOwner(
     .trim()
     .toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const planId = String(formData.get("planId") ?? "");
 
   if (!fullName || !businessName || !email || !password) {
     return { error: "Completá nombre, comercio, email y contraseña." };
   }
+  if (!planId) return { error: "Elegí un plan para el comercio." };
   if (password.length < MIN_PASSWORD_LENGTH) {
     return {
       error: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`,
@@ -93,6 +77,10 @@ export async function createOwner(
   if ("error" in auth) return auth;
 
   const service = createServiceClient();
+
+  if (!(await findPlan(service, planId))) {
+    return { error: "El plan elegido ya no existe." };
+  }
 
   const { data: created, error: createError } =
     await service.auth.admin.createUser({
@@ -115,7 +103,7 @@ export async function createOwner(
 
   const { data: org, error: orgError } = await service
     .from("organizations")
-    .insert({ name: businessName })
+    .insert({ name: businessName, plan_id: planId })
     .select("id")
     .single();
 
@@ -153,10 +141,12 @@ export async function updateOwner(
   const fullName = String(formData.get("fullName") ?? "").trim();
   const businessName = String(formData.get("businessName") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const planId = String(formData.get("planId") ?? "");
 
   if (!ownerId || !fullName || !businessName) {
     return { error: "El nombre y el comercio no pueden quedar vacíos." };
   }
+  if (!planId) return { error: "Elegí un plan para el comercio." };
   if (password && password.length < MIN_PASSWORD_LENGTH) {
     return {
       error: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`,
@@ -165,6 +155,9 @@ export async function updateOwner(
 
   const auth = await requireTargetOwner(ownerId);
   if ("error" in auth) return auth;
+
+  const plan = await findPlan(auth.service, planId);
+  if (!plan) return { error: "El plan elegido ya no existe." };
 
   const { error: profileError } = await auth.service
     .from("profiles")
@@ -175,10 +168,23 @@ export async function updateOwner(
 
   const { error: orgError } = await auth.service
     .from("organizations")
-    .update({ name: businessName })
+    .update({ name: businessName, plan_id: planId })
     .eq("id", auth.organizationId);
 
   if (orgError) return { error: "No se pudo actualizar el comercio." };
+
+  // Bajar de plan no borra nada: el comercio conserva lo que tiene, pero no
+  // puede sumar más hasta quedar dentro del límite. Se avisa para que el
+  // superadmin lo sepa.
+  const usage = await getPlanUsage(auth.service, auth.organizationId);
+  const overages = [
+    plan.max_employees != null && usage.employees > plan.max_employees
+      ? `${usage.employees}/${formatLimit(plan.max_employees)} cajeros`
+      : null,
+    plan.max_wallets != null && usage.wallets > plan.max_wallets
+      ? `${usage.wallets}/${formatLimit(plan.max_wallets)} billeteras`
+      : null,
+  ].filter(Boolean);
 
   if (password) {
     const { error: passwordError } = await auth.service.auth.admin.updateUserById(
@@ -191,10 +197,13 @@ export async function updateOwner(
   }
 
   revalidatePath("/superadmin");
+  const base = password
+    ? "Dueño actualizado y contraseña cambiada."
+    : "Dueño actualizado.";
   return {
-    success: password
-      ? "Dueño actualizado y contraseña cambiada."
-      : "Dueño actualizado.",
+    success: overages.length
+      ? `${base} Ojo: el comercio supera el plan ${plan.name} (${overages.join(", ")}); no podrá sumar más hasta liberar.`
+      : base,
   };
 }
 

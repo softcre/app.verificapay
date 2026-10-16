@@ -16,21 +16,26 @@ import {
   updateEmployee,
   EmployeeActionState,
 } from "@/app/cajeros/actions";
+import { isAtLimit } from "@/lib/plans";
 import { IconUsers, IconCheck, IconClose } from "./icons";
+import PlanUsageBar from "./plan-usage-bar";
 
 const initialState: EmployeeActionState = {};
 
 export default function EmployeesManager({
   employees,
   inviteCode,
+  plan,
 }: {
   employees: Profile[];
   inviteCode: string;
+  plan: { name: string | null; maxEmployees: number | null };
 }) {
   const [showForm, setShowForm] = useState(false);
   const [rowFeedback, setRowFeedback] = useState<EmployeeActionState>({});
 
   const active = employees.filter((e) => e.status === "active").length;
+  const atLimit = isAtLimit(plan.maxEmployees, employees.length);
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -48,11 +53,19 @@ export default function EmployeesManager({
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="shrink-0 px-4 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-sm font-medium transition-colors"
+          disabled={atLimit && !showForm}
+          className="shrink-0 px-4 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-sm font-medium transition-colors disabled:opacity-60 disabled:hover:bg-primary"
         >
           {showForm ? "Cancelar" : "Agregar cajero"}
         </button>
       </div>
+
+      <PlanUsageBar
+        planName={plan.name}
+        label="Cajeros"
+        used={employees.length}
+        limit={plan.maxEmployees}
+      />
 
       {showForm && <CreateEmployeeForm />}
 

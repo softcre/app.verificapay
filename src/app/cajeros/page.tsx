@@ -4,6 +4,7 @@ import Sidebar from "@/components/sidebar";
 import TopBar from "@/components/top-bar";
 import EmployeesManager from "@/components/employees-manager";
 import { Profile } from "@/lib/database.types";
+import { getPlanUsage } from "@/lib/plans";
 
 export default async function CajerosPage() {
   const supabase = await createClient();
@@ -31,12 +32,15 @@ export default async function CajerosPage() {
     redirect(profile.role === "superadmin" ? "/superadmin" : "/pagos");
   }
 
-  const { data: employees } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("organization_id", profile.organization_id)
-    .eq("role", "employee")
-    .order("created_at", { ascending: false });
+  const [{ data: employees }, usage] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("organization_id", profile.organization_id)
+      .eq("role", "employee")
+      .order("created_at", { ascending: false }),
+    getPlanUsage(supabase, profile.organization_id),
+  ]);
 
   const org = profile.organizations as unknown as {
     name: string;
@@ -62,6 +66,10 @@ export default async function CajerosPage() {
           <EmployeesManager
             employees={(employees ?? []) as Profile[]}
             inviteCode={org?.invite_code ?? ""}
+            plan={{
+              name: usage.plan?.name ?? null,
+              maxEmployees: usage.plan?.max_employees ?? null,
+            }}
           />
         </main>
       </div>

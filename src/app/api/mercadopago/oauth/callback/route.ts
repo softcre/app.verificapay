@@ -5,6 +5,7 @@ import {
   getMercadoPagoUser,
 } from "@/lib/mercadopago";
 import { saveWalletCredentials } from "@/lib/mercadopago-wallet";
+import { getPlanUsage, isAtLimit, planLimitMessage } from "@/lib/plans";
 import {
   getMercadoPagoRedirectUri,
   getSiteUrl,
@@ -83,6 +84,13 @@ export async function GET(req: Request) {
     .eq("collector_id", collectorId)
     .maybeSingle();
 
+  if (!existing) {
+    const usage = await getPlanUsage(supabase, profile.organization_id);
+    if (isAtLimit(usage.plan?.max_wallets, usage.wallets)) {
+      return redirectToWallets("?mp_error=limite_plan");
+    }
+  }
+
   const walletData = {
     organization_id: profile.organization_id,
     provider: "mercado_pago" as const,
@@ -112,7 +120,9 @@ export async function GET(req: Request) {
         .single();
 
   if (error || !wallet) {
-    return redirectToWallets("?mp_error=guardado_fallido");
+    return redirectToWallets(
+      planLimitMessage(error) ? "?mp_error=limite_plan" : "?mp_error=guardado_fallido"
+    );
   }
 
   const { error: credentialsError } = await saveWalletCredentials(wallet.id, {
