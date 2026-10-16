@@ -5,8 +5,11 @@ import {
   Wallet,
   WalletProvider,
   UserRole,
+  WALLET_PROVIDERS,
   WALLET_PROVIDER_LABELS,
 } from "@/lib/database.types";
+import { isAtLimit } from "@/lib/plans";
+import PlanUsageBar from "./plan-usage-bar";
 import {
   addWallet,
   deleteWallet,
@@ -17,14 +20,6 @@ import {
 import { IconWallet, IconCheck, IconClose, IconPencil } from "./icons";
 import WalletLogo from "./wallet-logo";
 
-const PROVIDERS: WalletProvider[] = [
-  "mercado_pago",
-  "naranja_x",
-  "uala",
-  "cuenta_dni",
-  "modo",
-];
-
 const initialState: WalletActionState = {};
 
 const MP_ERROR_MESSAGES: Record<string, string> = {
@@ -33,17 +28,26 @@ const MP_ERROR_MESSAGES: Record<string, string> = {
   sesion_expirada: "Tu sesión expiró. Volvé a iniciar sesión e intentá de nuevo.",
   canje_fallido: "No se pudo validar la autorización con Mercado Pago.",
   guardado_fallido: "No se pudo guardar la conexión con Mercado Pago.",
+  limite_plan: "Llegaste al máximo de billeteras de tu plan.",
+  proveedor_no_incluido: "Tu plan no incluye Mercado Pago.",
 };
 
 export default function WalletsManager({
   wallets,
   role,
   inviteCode,
+  plan,
   mpNotice,
 }: {
   wallets: Wallet[];
   role: UserRole;
   inviteCode: string;
+  plan: {
+    name: string | null;
+    maxWallets: number | null;
+    /** null = sin plan asignado, no se restringe. */
+    allowedProviders: WalletProvider[] | null;
+  };
   mpNotice?: { connected?: boolean; error?: string };
 }) {
   const [state, formAction, pending] = useActionState(
@@ -51,6 +55,11 @@ export default function WalletsManager({
     initialState
   );
   const isOwner = role === "owner";
+  const atLimit = isAtLimit(plan.maxWallets, wallets.length);
+  const providers = WALLET_PROVIDERS.filter(
+    (p) => !plan.allowedProviders || plan.allowedProviders.includes(p)
+  );
+  const mpAllowed = providers.includes("mercado_pago");
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -89,6 +98,17 @@ export default function WalletsManager({
             : "Estas son las billeteras activas para verificar pagos."}
         </p>
 
+        {isOwner && (
+          <div className="mb-4">
+            <PlanUsageBar
+              planName={plan.name}
+              label="Billeteras"
+              used={wallets.length}
+              limit={plan.maxWallets}
+            />
+          </div>
+        )}
+
         {wallets.length === 0 ? (
           <div className="bg-card border border-card-border rounded-xl p-8 text-center">
             <IconWallet className="w-8 h-8 text-muted-light mx-auto mb-2" />
@@ -107,7 +127,7 @@ export default function WalletsManager({
         )}
       </div>
 
-      {isOwner && (
+      {isOwner && mpAllowed && (
         <div className="bg-card border border-card-border rounded-xl p-5">
           <h3 className="text-sm font-semibold text-foreground mb-1">
             Conectar Mercado Pago
@@ -125,12 +145,13 @@ export default function WalletsManager({
             href="/api/mercadopago/oauth/start"
             className="inline-flex items-center px-4 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-sm font-medium transition-colors"
           >
-            Conectar con Mercado Pago
+            {/* Con el tope alcanzado igual se puede reconectar una cuenta existente. */}
+            {atLimit ? "Reconectar cuenta de Mercado Pago" : "Conectar con Mercado Pago"}
           </a>
         </div>
       )}
 
-      {isOwner && (
+      {isOwner && !atLimit && providers.length > 0 && (
         <div className="bg-card border border-card-border rounded-xl p-5">
           <h3 className="text-sm font-semibold text-foreground mb-3">
             Agregar billetera manualmente
@@ -146,7 +167,7 @@ export default function WalletsManager({
                   required
                   className="w-full px-3 py-2 rounded-lg border border-card-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 >
-                  {PROVIDERS.map((p) => (
+                  {providers.map((p) => (
                     <option key={p} value={p}>
                       {WALLET_PROVIDER_LABELS[p]}
                     </option>

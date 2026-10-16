@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ProfileStatus } from "@/lib/database.types";
+import { getPlanUsage, isAtLimit, planLimitMessage } from "@/lib/plans";
 
 export interface EmployeeActionState {
   error?: string;
@@ -94,6 +95,15 @@ export async function createEmployee(
 
   const service = createServiceClient();
 
+  // Se valida antes de crear el usuario de auth para no tener que borrarlo
+  // después. El trigger de la base vuelve a chequear al insertar el perfil.
+  const usage = await getPlanUsage(service, auth.organizationId);
+  if (isAtLimit(usage.plan?.max_employees, usage.employees)) {
+    return {
+      error: `Tu plan ${usage.plan?.name ?? ""} permite hasta ${usage.plan?.max_employees} cajeros. Eliminá uno o pedí un cambio de plan.`,
+    };
+  }
+
   const { data: created, error: createError } =
     await service.auth.admin.createUser({
       email,
@@ -126,7 +136,10 @@ export async function createEmployee(
   if (profileError) {
     // Sin perfil, el usuario de auth quedaría huérfano y bloquearía el email.
     await service.auth.admin.deleteUser(created.user.id);
-    return { error: "No se pudo crear el perfil del cajero." };
+    return {
+      error:
+        planLimitMessage(profileError) ?? "No se pudo crear el perfil del cajero.",
+    };
   }
 
   revalidatePath("/cajeros");

@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { WalletProvider } from "@/lib/database.types";
+import { WalletProvider, WALLET_PROVIDER_LABELS } from "@/lib/database.types";
+import {
+  getPlanUsage,
+  isAtLimit,
+  isProviderAllowed,
+  planLimitMessage,
+} from "@/lib/plans";
 import { getMercadoPagoCollectorId } from "@/lib/mercadopago";
 import { saveWalletCredentials } from "@/lib/mercadopago-wallet";
 
@@ -37,6 +43,18 @@ export async function addWallet(
 
   if (!profile) return { error: "No se encontró tu perfil." };
 
+  const usage = await getPlanUsage(supabase, profile.organization_id);
+  if (!isProviderAllowed(usage.plan, provider)) {
+    return {
+      error: `Tu plan ${usage.plan?.name ?? ""} no incluye ${WALLET_PROVIDER_LABELS[provider] ?? "ese proveedor"}.`,
+    };
+  }
+  if (isAtLimit(usage.plan?.max_wallets, usage.wallets)) {
+    return {
+      error: `Tu plan ${usage.plan?.name ?? ""} permite hasta ${usage.plan?.max_wallets} billeteras.`,
+    };
+  }
+
   let collectorId: string | null = null;
   if (provider === "mercado_pago" && accessToken) {
     try {
@@ -62,7 +80,9 @@ export async function addWallet(
     .single();
 
   if (error || !wallet) {
-    return { error: "No se pudo agregar la billetera." };
+    return {
+      error: planLimitMessage(error) ?? "No se pudo agregar la billetera.",
+    };
   }
 
   if (accessToken) {

@@ -5,6 +5,8 @@ import {
   getMercadoPagoUser,
 } from "@/lib/mercadopago";
 import { saveWalletCredentials } from "@/lib/mercadopago-wallet";
+import { getPlanUsage, isAtLimit, planLimitMessage } from "@/lib/plans";
+import { errorMessage, logIntegrationEvent } from "@/lib/integration-events";
 import {
   getMercadoPagoRedirectUri,
   getSiteUrl,
@@ -69,7 +71,12 @@ export async function GET(req: Request) {
       code,
       redirectUri: getMercadoPagoRedirectUri(),
     });
-  } catch {
+  } catch (err) {
+    await logIntegrationEvent({
+      source: "oauth",
+      message: `No se pudo canjear el código de autorización de Mercado Pago: ${errorMessage(err)}`,
+      organizationId: profile.organization_id,
+    });
     return redirectToWallets("?mp_error=canje_fallido");
   }
 
@@ -82,6 +89,13 @@ export async function GET(req: Request) {
     .eq("provider", "mercado_pago")
     .eq("collector_id", collectorId)
     .maybeSingle();
+
+  if (!existing) {
+    const usage = await getPlanUsage(supabase, profile.organization_id);
+    if (isAtLimit(usage.plan?.max_wallets, usage.wallets)) {
+      return redirectToWallets("?mp_error=limite_plan");
+    }
+  }
 
   const walletData = {
     organization_id: profile.organization_id,
@@ -112,6 +126,15 @@ export async function GET(req: Request) {
         .single();
 
   if (error || !wallet) {
+    if (planLimitMessage(error)) {
+      return redirectToWallets("?mp_error=limite_plan");
+    }
+    await logIntegrationEvent({
+      source: "oauth",
+      message: `No se pudo guardar la billetera de Mercado Pago: ${errorMessage(error)}`,
+      organizationId: profile.organization_id,
+      detail: { collectorId },
+    });
     return redirectToWallets("?mp_error=guardado_fallido");
   }
 
@@ -121,6 +144,12 @@ export async function GET(req: Request) {
   });
 
   if (credentialsError) {
+    await logIntegrationEvent({
+      source: "oauth",
+      message: `No se pudieron guardar los tokens de Mercado Pago: ${errorMessage(credentialsError)}`,
+      organizationId: profile.organization_id,
+      walletId: wallet.id,
+    });
     return redirectToWallets("?mp_error=guardado_fallido");
   }
 
